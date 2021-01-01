@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8">
+		
+		<link rel="stylesheet" href="css/normalize.css" type="text/css">
+		<link rel="stylesheet" href="css/style.css" type="text/css">
+
+		<title>torplay</title>
+	</head>
+	<body>
+		<main id="app">
+			<section class="device-selection">
+				<h1>Devices:</h1>
+
+				<ul class="device-list is-blocks">
+					<li v-for="name in deviceNames">
+						<button class="is-block" :class="{active:name==currentDeviceName}" @click="selectDevice(name)">{{getFriendlyName(name)}}</button>
+					</li>
+				</ul>
+			</section>
+
+			<section class="playlist">
+				<h1>playlist:</h1>
+
+				<ul class="playlist is-blocks">
+					<li v-if="!playlist.length">
+						<div class="pad center">
+							No media
+						</div>
+					</li>
+
+					<li v-for="media,mIndex in playlist" v-else>
+						<button class="is-block" :class="{active:currentPlaylistIndex==mIndex}" @click="selectMedia(mIndex)">
+							<div class="flex">
+								<div class="item-flex">
+									{{media.filename}}
+								</div>
+
+								<div>
+									<a class="btn" @click.stop="removeMediaFromPlaylist(mIndex)">-</a>
+								</div>
+							</div>
+						</button>
+					</li>
+				</ul>
+
+				<div class="pad-t right">
+					<button @click="isAddFromTorrent=true">Add from torrent</button>
+				</div>
+			</section>
+
+			<section class="device-control" v-if="currentPlaylistIndex>-1">
+				<h1>Device Control ({{getFriendlyName(currentDeviceName)}}): </h1>
+
+				<div>
+					{{getMediaDeliveryPath(playlist[currentPlaylistIndex].filename)}}
+					<button @click="playMedia(playlist[currentPlaylistIndex])">play</button>
+					<!---button @click="currentDevice.resume()">resume</button>
+					<button @click="currentDevice.pause()">pause</button>
+					<button @click="currentDevice.stop()">stop</button--->
+				</div>
+			</section>
+
+			<!---overlay sections-->
+			<section class="add-torrent-media is-overlay" v-if="isAddFromTorrent">
+				<h1>Torrent:</h1>
+
+				<div class="flex">
+					<div class="item-flex">
+						<input type="text" v-model="torrentUrl">
+					</div>
+
+					<div>
+						<button @click="getTorrentFileList(torrentUrl)">Read Torrent</button>
+					</div>
+				</div>
+
+				<div class="pad-t">
+					<ul class="torrent-files is-blocks">
+						<li v-if="!torrentFiles.length">
+							<div class="pad center">
+								No torrent files loaded
+							</div>
+						</li>
+	
+						<li v-for="file in torrentFiles" v-else>
+							<button class="is-block" @click="selectTorrentFile(file.name)" :class="{active:selectedTorrentFiles.indexOf(file.name)>-1}">
+								<div class="flex">
+									<div class="item-flex">
+										{{file.name}}
+									</div>
+								</div>
+							</button>
+						</li>
+					</ul>
+
+					<div class="pad-t right">
+						<button :disabled="!torrentFiles.length" @click="addAllTorrentFiles()">Add All</button>
+						<button :disabled="!torrentFiles.length||!selectedTorrentFiles.length" @click="addSelectedTorrentFiles()">Add Selected</button>
+						<button @click="isAddFromTorrent=false">Cancel</button>
+					</div>
+				</div>
+			</section>
+			<!---div>
+				<label>
+					media:
+					<input type="text" v-model="mediaUrl">
+					<button @click="initMedia(mediaUrl)">load media</button>
+				</label>
+			</div>
+
+			<div v-if="torrentFiles.length">
+				<div>files:</div>
+				<ul>
+					<li v-for="file in torrentFiles">
+						<button @click="streamTorrentFile(file)">{{file.name}}</button>
+					</li>
+				</ul>
+			</div>
+
+			<div v-if="mediaPath">
+				<div>media path: {{mediaPath}}</div>
+				<div>devices:</div>
+				<ul>
+					<li v-for="device in devices">
+						<button @click="selectDevice(device)">{{device.friendlyName}}</button>
+					</li>
+				</ul>
+			</div>
+
+			<div v-if="currentDevice">
+				playing on: {{currentDevice.friendlyName}}
+				<button @click="deselectDevice(currentDevice)">x</button>
+
+				<div>
+					<button @click="currentDevice.resume()">play</button>
+					<button @click="currentDevice.pause()">pause</button>
+					<button @click="currentDevice.stop()">stop</button>
+				</div>
+			</div--->
+		</main>
+	</body>
+</html>
