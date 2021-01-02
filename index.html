@@ -53,12 +53,27 @@
 			<section class="device-control" v-if="currentPlaylistIndex>-1">
 				<h1>Device Control ({{getFriendlyName(currentDeviceName)}}): </h1>
 
-				<div>
-					{{getMediaDeliveryPath(playlist[currentPlaylistIndex].filename)}}
-					<button @click="playMedia(playlist[currentPlaylistIndex])">play</button>
-					<!---button @click="currentDevice.resume()">resume</button>
+				<div v-if="!currentDevice||!currentDevice.client||!isServerRunning">
+					<button @click="startMediaDelivery(currentMedia,true)">begin playback</button>
+				</div>
+
+				<div v-else-if="currentDevice.client">
+					<button @click="currentDevice.resume()">resume</button>
 					<button @click="currentDevice.pause()">pause</button>
-					<button @click="currentDevice.stop()">stop</button--->
+					<button @click="currentDevice.close()">stop</button>
+					<button @click="currentDevice.seekTo(100,function(e,r){console.log(e,r,'test')})">seek to 100</button>
+
+					<label v-if="currentMedia.subtitles.length">
+						cc:
+						<select v-model="currentCcIndex">
+							<option value="-1">off</option>
+							<option v-for="cc,ccIndex in currentMedia.subtitles" :value="ccIndex">{{cc}}</option>
+						</select>
+					</label>
+
+					<br>
+
+					<input type="range" min="0" :max="currentDuration" step="1" v-model="currentPlayhead" disabled>{{currentPlayhead}}/{{currentDuration}}
 				</div>
 			</section>
 
@@ -84,7 +99,7 @@
 							</div>
 						</li>
 	
-						<li v-for="file in torrentFiles" v-else>
+						<li v-for="file in _torrentFiles" v-else>
 							<button class="is-block" @click="selectTorrentFile(file.name)" :class="{active:selectedTorrentFiles.indexOf(file.name)>-1}">
 								<div class="flex">
 									<div class="item-flex">
@@ -102,43 +117,6 @@
 					</div>
 				</div>
 			</section>
-			<!---div>
-				<label>
-					media:
-					<input type="text" v-model="mediaUrl">
-					<button @click="initMedia(mediaUrl)">load media</button>
-				</label>
-			</div>
-
-			<div v-if="torrentFiles.length">
-				<div>files:</div>
-				<ul>
-					<li v-for="file in torrentFiles">
-						<button @click="streamTorrentFile(file)">{{file.name}}</button>
-					</li>
-				</ul>
-			</div>
-
-			<div v-if="mediaPath">
-				<div>media path: {{mediaPath}}</div>
-				<div>devices:</div>
-				<ul>
-					<li v-for="device in devices">
-						<button @click="selectDevice(device)">{{device.friendlyName}}</button>
-					</li>
-				</ul>
-			</div>
-
-			<div v-if="currentDevice">
-				playing on: {{currentDevice.friendlyName}}
-				<button @click="deselectDevice(currentDevice)">x</button>
-
-				<div>
-					<button @click="currentDevice.resume()">play</button>
-					<button @click="currentDevice.pause()">pause</button>
-					<button @click="currentDevice.stop()">stop</button>
-				</div>
-			</div--->
 		</main>
 	</body>
 </html>

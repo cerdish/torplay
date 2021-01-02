@@ -5,6 +5,12 @@ const ChromecastAPI = require('chromecast-api')
 const readTorrent = require('read-torrent')
 const torrentStream = require('torrent-stream')
 const _ = require('lodash')
+const mime = require('mime')
+const srt2vtt = require('srt-to-vtt')
+
+//supported file formats for chromecast
+const SUPPORTED_FORMATS=["mp4","m4v","webm","mkv"]
+const STATUS_INTERVAL_DURATION=1000
 
 //this is the client we use to detect chromecast devices
 const clientDiscovery = new ChromecastAPI()
@@ -26,13 +32,21 @@ const app=new Vue({
         isAddFromTorrent:false,
         torrentFiles:[],
         selectedTorrentFiles:[],
-        mediaDeliveryPath:""
+        mediaDeliveryPath:"",
+        isServerRunning:false,
+        currentCcIndex:0,
+        seekTo:0,
+        statusInterval:false,
+        currentPlayhead:0,
+        currentDuration:0
     },
     computed:{
         currentDevice:function(){
             if(!this.currentDeviceName) return false
 
-            return _.find(this.devices,{name:this.currentDeviceName}) || ""
+            var device=_.find(this.devices,{name:this.currentDeviceName}) || ""
+
+            return device
         },
         deviceNames:function(){
             var deviceList=this.devices.map(function(d){
@@ -42,6 +56,18 @@ const app=new Vue({
             deviceList.unshift("")
 
             return deviceList
+        },
+        _torrentFiles:function(){
+            return _.filter(this.torrentFiles,function(f){
+                var ext=mime.getExtension(mime.getType(f.name))
+
+                return SUPPORTED_FORMATS.indexOf(ext)>-1
+            })
+        },
+        currentMedia:function(){
+            if(this.currentPlaylistIndex>-1&&this.currentPlaylistIndex<this.playlist.length) return this.playlist[this.currentPlaylistIndex]
+
+            return false
         }
     },
     watch:{
@@ -52,6 +78,33 @@ const app=new Vue({
         playlist:function(){
             //when the playlist changes we store those changes in local storage
             localStorage.playlist=JSON.stringify(this.playlist)
+        },
+        currentPlaylistIndex:function(){
+            //when the index changes we save that to local storage for when the user returns to the app later
+            localStorage.currentPlaylistIndex=this.currentPlaylistIndex
+        },
+        currentCcIndex:function(){
+            //if we change currnet cc index and there is a device set we change the cc index for that device
+            if(this.currentDevice){
+                if(this.currentCcIndex==-1) this.currentDevice.subtitlesOff()
+                else this.currentDevice.changeSubtitles(this.currentCcIndex)
+            }
+        },
+        currentDevice:function(newDevice,oldDevice){
+            //if there is already a device set (not local machine) close that connection
+            if(oldDevice) oldDevice.close()
+
+            if(newDevice){
+                if(!this.isServerRunning) this.startMediaDelivery(this.currentMedia)
+                
+                newDevice._tryJoin(function(){
+                    if(newDevice.player) newDevice.getStatus(function(e,s){
+                        console.log(s)
+                    })
+                })
+            }
+
+            console.log(this.currentDevice)
         }
     },
     methods:{
@@ -61,8 +114,6 @@ const app=new Vue({
             return device ? device.friendlyName : "Local machine"
         },
         selectDevice:function(name){
-            //if there is already a device set (not local machine) close that connection
-            if(this.currentDevice) this.currentDevice.close();console.log(this.currentDevice);
             //save the current device name in the vue scope and in local storage for later retrieval
             this.currentDeviceName = localStorage.currentDeviceName = name
         },
@@ -75,6 +126,7 @@ const app=new Vue({
             readTorrent(url,function(e,torrent){
                 var torEng=torrentStream(torrent)
 
+                //add allowed file types to the file list to show the user to select from
                 torEng.on('ready',function(){
                     self.torrentFiles=torEng.files
 
@@ -92,17 +144,30 @@ const app=new Vue({
         },
         addSelectedTorrentFiles:function(){
             for(var i=0;i<this.selectedTorrentFiles.length;i++){
-                this.addMediaToPlaylist({torrentUrl:this.torrentUrl,filename:this.selectedTorrentFiles[i]})
+                this.addTorrentFileToPlaylist(this.selectedTorrentFiles[i])
             }
 
             this.isAddFromTorrent=false;
         },
         addAllTorrentFiles:function(){
-            for(var i=0;i<this.torrentFiles.length;i++){
-                this.addMediaToPlaylist({torrentUrl:this.torrentUrl,filename:this.torrentFiles[i].name})
+            for(var i=0;i<this._torrentFiles.length;i++){
+                this.addTorrentFileToPlaylist(this._torrentFiles[i].name)
             }
 
             this.isAddFromTorrent=false;
+        },
+        addTorrentFileToPlaylist:function(filename){
+            var noExtName=filename.substr(0,filename.lastIndexOf("."))
+
+            var subtitles=_.map(_.filter(this.torrentFiles,function(f){
+                var ext=mime.getExtension(mime.getType(f.name))
+                
+                return ext=="srt"&&f.name.indexOf(noExtName)>-1
+            }),function(f){
+                return f.name
+            })
+
+            this.addMediaToPlaylist({torrentUrl:this.torrentUrl,filename:filename,subtitles:subtitles})
         },
         addMediaToPlaylist:function(media){
             this.playlist.push(media)
@@ -117,33 +182,65 @@ const app=new Vue({
         },
         selectMedia:function(mediaIndex){
             this.currentPlaylistIndex=mediaIndex
+            this.currentCCIndex=0
+            this.currentPlayhead=0
+            this.currentDuration=0
 
-            localStorage.currentPlaylistIndex=mediaIndex
+            this.startMediaDelivery(this.playlist[mediaIndex],true)
         },
-        playMedia:function(media){
+        startMediaDelivery:function(media,isPlayMedia){
             var self=this
 
-            console.log(media)
+            //if(this.currentDevice) this.currentDevice.close()
 
             if(media.torrentUrl){
                 readTorrent(media.torrentUrl,function(e,torrent){
                     if(e) console.log(e)
-                    console.log(torrent)
 
                     self.resetMediaDelivery()
                     
                     torrentEngine=torrentStream(torrent)
     
                     torrentEngine.on('ready',function(){
-                        var file=_.find(torrentEngine.files,{name:media.filename})
+                        var mediaFile=_.find(torrentEngine.files,{name:media.filename})
 
-                        var stream=file.createReadStream()
-
-                        console.log(stream)
-                        console.log(file)
+                        var srtFiles={}
+                        var srtFile=_.find(torrentEngine.files,function(f){
+                            var filename=media.filename.substr(0,media.filename.lastIndexOf("."))
+                            var ext=mime.getExtension(mime.getType(f.name))
+                            
+                            return ext=="srt"&&f.name.indexOf(filename)>-1
+                        })
 
                         server=http.createServer(function(req, res){
-                            stream.pipe(res)
+                            var filename=decodeURI(req.url.substr(req.url.lastIndexOf("/")+1,req.url.length))
+                            var type=mime.getType(req.url)
+                            var ext=mime.getExtension(type)
+
+                            console.log(filename)
+                            
+                            if(ext=='srt'&&media.subtitles.indexOf(filename)>-1){
+                                console.log("piping srt")
+                                
+                                res.setHeader("Access-Control-Allow-Origin","*")
+                                res.setHeader("Content-Type","text/plain")
+
+                                if(!srtFiles[filename]) srtFiles[filename]=_.find(torrentEngine.files,{name:filename})
+                                
+                                var srtStream=srtFiles[filename].createReadStream()
+
+                                srtStream.pipe(srt2vtt()).pipe(res)
+                            }else if(SUPPORTED_FORMATS.indexOf(ext)>-1&&filename==media.filename){
+                                console.log("piping media")
+
+                                var mediaStream=mediaFile.createReadStream()
+                                
+                                mediaStream.pipe(res)
+                            }else{
+                                console.log("not found")
+                                res.end()
+                            }
+                            
                         })
                         
                         server.on('connection', function (socket) {
@@ -151,84 +248,80 @@ const app=new Vue({
                         })
 
                         server.listen(8080,function(){
-                            var mediaDeliveryPath=self.getMediaDeliveryPath(file.name)
-    
-                            if(self.currentDevice) self.currentDevice.play(mediaDeliveryPath)
-    
-                            self.mediaDeliveryPath=mediaDeliveryPath
+                            if(isPlayMedia) self.playMedia(media)
+                            self.isServerRunning=true
                         })
                     })
                 })
             }
         },
+        playMedia:function(media){
+            var self=this
+            var mediaDeliveryPath=this.getMediaDeliveryPath(media.filename)
+    
+            if(this.currentDevice){
+                var chromecastMedia={
+                    url:mediaDeliveryPath,
+                    subtitles:media.subtitles.length ? _.map(media.subtitles,function(s){
+                        return {
+                            url:self.getMediaDeliveryPath(s)
+                        }
+                    }) : [{
+                        url:self.getMediaDeliveryPath("no-srt.srt")
+                    }]
+                }
+
+                console.log(chromecastMedia)
+
+                this.currentDevice.play(chromecastMedia,function(e,s){
+                    console.log(e,s)
+                })
+                
+                this.currentDevice.on("status",function(s){
+                    console.log(s)
+                })
+
+                this.currentDevice.on("finished",function(){
+                    if(self.currentPlaylistIndex<self.playlist.length-1){
+                        self.selectMedia(self.currentPlaylistIndex+1)
+                    }
+                })
+            }
+        },
         resetMediaDelivery:function(){
+            var self=this
+
             if(torrentEngine) torrentEngine.destroy()
-            if(server) server.close()
+            if(server) server.close(function(){
+                self.isServerRunning=false
+            })
 
             torrentEngine=false
             server=false
         },
         getMediaDeliveryPath:function(filename){
             return "http://" + address() + ":8080/" + filename
-        },
-        /*initMedia:function(mediaUrl){
-            var self=this
-
-            if(torrentEngine){
-                if(torrentEngine.server) torrentEngine.server.close()
-
-                torrentEngine.destroy()
-            }
-            
-            torrentEngine=torrentStream(mediaUrl)
-
-            torrentEngine.on('ready',function(){
-                self.torrentFiles=torrentEngine.files
-                console.log(torrentEngine.files)
-                //console.log('filename:', file.name)
-                //var stream = file.createReadStream();
-                // stream is readable stream to containing the file content
-            });
-
-            localStorage.mediaUrl=this.mediaUrl
-        },
-        streamTorrentFile:function(file){
-            var stream=file.createReadStream()
-
-            console.log(stream)
-            console.log(file)
-
-            if(torrentEngine.server) torrentEngine.server.close()
-
-            torrentEngine.server=http.createServer(function(req, res){
-                stream.pipe(res)
-            })
-            
-            torrentEngine.server.on('connection', function (socket) {
-                socket.setTimeout(36000000)
-            })
-
-            torrentEngine.server.listen(8080)
-
-            this.mediaPath="http://" + address() + ":8080/" + file.name
-        },*/
-        playFile:function(file){
-            device.play(file)
-        },
-        deselectDevice:function(device){
-            //if no device is passed in we try for the current device
-            device=device||this.currentDevice
-            //close connection to the device
-            device.close()
-
-            this.currentDeviceName = localStorage.currentDeviceName = ""
         }
     },
     beforeMount:function(){
         var self=this
 
+        //add devices to device list
         clientDiscovery.on('device',function(device){
             self.devices=clientDiscovery.devices
         })
+
+        //startup the status interval
+        this.statusInterval=setInterval(function(){
+            if(self.currentDevice&&self.currentDevice.player&&self.currentDevice.player.client){
+                self.currentDevice.player.getStatus(function(e,s){
+                    if(e) console.log(e)
+                    else if(s){
+                        self.currentPlayhead=s.currentTime
+                        if(s.media) self.currentDuration=s.media.duration
+                    }
+                })
+            }
+        },STATUS_INTERVAL_DURATION)
     }
 })
