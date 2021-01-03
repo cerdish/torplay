@@ -4,24 +4,15 @@
 		<meta charset="UTF-8">
 		
 		<link rel="stylesheet" href="css/normalize.css" type="text/css">
+		<link href='https://fonts.googleapis.com/icon?family=Material+Icons' rel='stylesheet'>
 		<link rel="stylesheet" href="css/style.css" type="text/css">
 
 		<title>torplay</title>
 	</head>
 	<body>
 		<main id="app">
-			<section class="device-selection">
-				<h1>Devices:</h1>
-
-				<ul class="device-list is-blocks">
-					<li v-for="name in deviceNames">
-						<button class="is-block" :class="{active:name==currentDeviceName}" @click="selectDevice(name)">{{getFriendlyName(name)}}</button>
-					</li>
-				</ul>
-			</section>
-
 			<section class="playlist">
-				<h1>playlist:</h1>
+				<h1>Playlist</h1>
 
 				<ul class="playlist is-blocks">
 					<li v-if="!playlist.length">
@@ -33,12 +24,16 @@
 					<li v-for="media,mIndex in playlist" v-else>
 						<button class="is-block" :class="{active:currentPlaylistIndex==mIndex}" @click="selectMedia(mIndex)">
 							<div class="flex">
-								<div class="item-flex">
+								<div class="item-flex playlist-filename">
 									{{media.filename}}
 								</div>
 
-								<div>
-									<a class="btn" @click.stop="removeMediaFromPlaylist(mIndex)">-</a>
+								<div style="margin:-0.5em 0;">
+									<i class="material-icons light-grey" v-if="media.subtitles.length">closed_caption</i>
+									
+									<a class="list-btn red" @click.stop="removeMediaFromPlaylist(mIndex)">
+										<i class="material-icons">cancel</i>
+									</a>
 								</div>
 							</div>
 						</button>
@@ -50,30 +45,85 @@
 				</div>
 			</section>
 
-			<section class="device-control" v-if="currentPlaylistIndex>-1">
-				<h1>Device Control ({{getFriendlyName(currentDeviceName)}}): </h1>
+			<section class="device-control" v-if="currentMedia" :key="currentMedia.filename">
+				<div class="flex">
+					<div>
+						<h1>Device Control</h1>
+					</div>
 
-				<div v-if="!currentDevice||!currentDevice.client||!isServerRunning">
-					<button @click="startMediaDelivery(currentMedia,true)">begin playback</button>
+					<div class="pad">
+						<select v-model="currentDeviceName" @change="selectDevice($event.target.value)">
+							<option v-for="name in deviceNames" :value="name">{{getFriendlyName(name)}}</option>
+						</select>
+					</div>
+
+					<div>
+						({{currentMedia ? currentMedia.filename : "no media selected"}})
+					</div>
 				</div>
 
-				<div v-else-if="currentDevice.client">
-					<button @click="currentDevice.resume()">resume</button>
-					<button @click="currentDevice.pause()">pause</button>
-					<button @click="currentDevice.close()">stop</button>
-					<button @click="currentDevice.seekTo(100,function(e,r){console.log(e,r,'test')})">seek to 100</button>
+				<div>{{currentDeviceStatus}}</div>
 
-					<label v-if="currentMedia.subtitles.length">
-						cc:
-						<select v-model="currentCcIndex">
-							<option value="-1">off</option>
-							<option v-for="cc,ccIndex in currentMedia.subtitles" :value="ccIndex">{{cc}}</option>
-						</select>
-					</label>
+				<div v-if="isServerRunning&&currentDeviceName">
+					<div v-if="!currentDevice||!currentDevice.client||!isServerRunning">
+						<button @click="startMediaDelivery(currentMedia,true)">begin playback</button>
+						<button @click="currentDevice._tryJoin(function(e,s){})">join session</button>
+					</div>
+	
+					<div v-else-if="currentDevice.client">
+						<div class="flex">
+							<div class="item-flex">
+								<input type="range" min="0" :max="currentMedia.duration" step="1" v-model="currentMedia.currentTime" @change="currentDevice.seekTo($event.target.value)">
+							</div>
+							
+							<div style="width:150px;">
+								{{Math.round(currentMedia.currentTime)}} / {{Math.round(currentMedia.duration)}}
+							</div>
+						</div>
 
-					<br>
+						<button @click="currentDevice.resume()">resume</button>
+						<button @click="currentDevice.pause()">pause</button>
+						<button @click="currentDeviceName="">stop</button>
+	
+						<label>
+							playback rate:
+							<select @change="currentDevice.setPlaybackRate($event.target.value)">
+								<option selected>1</option>
+								<option>1.5</option>
+								<option>2</option>
+								<option>5</option>
+								<option>10</option>
+							</select>
+						</label>
+						
+						<label v-if="currentMedia.subtitles.length">
+							cc:
+							<select v-model="currentCcIndex">
+								<option value="-1">off</option>
+								<option v-for="cc,ccIndex in currentMedia.subtitles" :value="ccIndex">{{cc}}</option>
+							</select>
+						</label>
+					</div>
+				</div>
 
-					<input type="range" min="0" :max="currentDuration" step="1" v-model="currentPlayhead" disabled>{{currentPlayhead}}/{{currentDuration}}
+				<div v-else-if="isServerRunning">
+					<video ref="vidEl" :src="getMediaDeliveryPath(currentMedia.filename)" controls style="width:100%;" autoplay>
+						<track v-for="subtitle in currentMedia.subtitles" :src="getMediaDeliveryPath(subtitle)" :label="subtitle">
+					</video>
+
+					<div>
+						<label v-if="currentMedia.subtitles.length">
+							cc:
+							<select @change="activateSubtitle($event.target.value)">
+								<option value="-1">off</option>
+								<option v-for="cc,ccIndex in currentMedia.subtitles" :value="ccIndex">{{cc}}</option>
+							</select>
+						</label>
+					</div>
+				</div>
+
+				<div v-else>
+					<button @click="startMediaDelivery(currentMedia,false)">start media deliver</button>
 				</div>
 			</section>
 

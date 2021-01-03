@@ -6,7 +6,9 @@ const readTorrent = require('read-torrent')
 const torrentStream = require('torrent-stream')
 const _ = require('lodash')
 const mime = require('mime')
-const srt2vtt = require('srt-to-vtt')
+const srt2vtt = require('srt-to-vtt');
+const { forEach } = require('lodash');
+const parseRange = require('range-parser')
 
 //supported file formats for chromecast
 const SUPPORTED_FORMATS=["mp4","m4v","webm","mkv"]
@@ -34,11 +36,12 @@ const app=new Vue({
         selectedTorrentFiles:[],
         mediaDeliveryPath:"",
         isServerRunning:false,
-        currentCcIndex:0,
+        currentCcIndex:-1,
         seekTo:0,
         statusInterval:false,
-        currentPlayhead:0,
-        currentDuration:0
+        playbackRate:1,
+        currentDeviceStatus:"DISCONNECTED",
+        currentServerStatus:"STOPPED"
     },
     computed:{
         currentDevice:function(){
@@ -77,7 +80,7 @@ const app=new Vue({
         },
         playlist:function(){
             //when the playlist changes we store those changes in local storage
-            localStorage.playlist=JSON.stringify(this.playlist)
+            this.storePlaylist()
         },
         currentPlaylistIndex:function(){
             //when the index changes we save that to local storage for when the user returns to the app later
@@ -91,6 +94,8 @@ const app=new Vue({
             }
         },
         currentDevice:function(newDevice,oldDevice){
+            var self=this
+
             //if there is already a device set (not local machine) close that connection
             if(oldDevice) oldDevice.close()
 
@@ -100,6 +105,7 @@ const app=new Vue({
                 newDevice._tryJoin(function(){
                     if(newDevice.player) newDevice.getStatus(function(e,s){
                         console.log(s)
+                        if(s) self.currentDeviceStatus=s.playerState
                     })
                 })
             }
@@ -114,8 +120,46 @@ const app=new Vue({
             return device ? device.friendlyName : "Local machine"
         },
         selectDevice:function(name){
+            var self=this
+
+            this.currentDeviceStatus="CONNECTING"
+
+            var device=_.find(this.devices,{name:name})
+
+            //if listeners don't exist add them
+            if(device&&!device._events.status){
+                console.log("adding listeners: ",device)
+
+                device.on("connected",function(s){
+                    self.currentDeviceStatus="CONNECTED"
+                })
+                
+                device.on("status",function(s){
+                    self.currentDeviceStatus=s.playerState
+                })
+    
+                device.on("finished",function(){
+                    console.log("media ended")
+    
+                    if(self.currentPlaylistIndex<self.playlist.length-1){
+                        console.log("playing next item in playlist")
+    
+                        self.currentMedia.currentTime=0
+    
+                        self.selectMedia(1*self.currentPlaylistIndex+1)
+                    }
+                })
+            }
+
             //save the current device name in the vue scope and in local storage for later retrieval
             this.currentDeviceName = localStorage.currentDeviceName = name
+        },
+        closeDeviceConnection:function(device){
+            var self=this
+
+            device.close(function(e){
+                self.currentDeviceStatus="DISCONNECTED"
+            })
         },
         getTorrentFileList:function(url){
             var self=this
@@ -167,7 +211,7 @@ const app=new Vue({
                 return f.name
             })
 
-            this.addMediaToPlaylist({torrentUrl:this.torrentUrl,filename:filename,subtitles:subtitles})
+            this.addMediaToPlaylist({torrentUrl:this.torrentUrl,filename:filename,subtitles:subtitles,currentTime:0,duration:0})
         },
         addMediaToPlaylist:function(media){
             this.playlist.push(media)
@@ -180,18 +224,22 @@ const app=new Vue({
 
             this.playlist.splice(mIndex,1)
         },
+        storePlaylist:function(){
+            localStorage.playlist=JSON.stringify(this.playlist)
+        },
         selectMedia:function(mediaIndex){
             this.currentPlaylistIndex=mediaIndex
-            this.currentCCIndex=0
-            this.currentPlayhead=0
-            this.currentDuration=0
+            this.currentCCIndex=-1
+            this.playbackRate=1
+
+            console.log("selecting media: "+mediaIndex)
 
             this.startMediaDelivery(this.playlist[mediaIndex],true)
         },
         startMediaDelivery:function(media,isPlayMedia){
             var self=this
 
-            //if(this.currentDevice) this.currentDevice.close()
+            console.log("startingServer for: ",media)
 
             if(media.torrentUrl){
                 readTorrent(media.torrentUrl,function(e,torrent){
@@ -205,12 +253,6 @@ const app=new Vue({
                         var mediaFile=_.find(torrentEngine.files,{name:media.filename})
 
                         var srtFiles={}
-                        var srtFile=_.find(torrentEngine.files,function(f){
-                            var filename=media.filename.substr(0,media.filename.lastIndexOf("."))
-                            var ext=mime.getExtension(mime.getType(f.name))
-                            
-                            return ext=="srt"&&f.name.indexOf(filename)>-1
-                        })
 
                         server=http.createServer(function(req, res){
                             var filename=decodeURI(req.url.substr(req.url.lastIndexOf("/")+1,req.url.length))
@@ -223,24 +265,46 @@ const app=new Vue({
                                 console.log("piping srt")
                                 
                                 res.setHeader("Access-Control-Allow-Origin","*")
-                                res.setHeader("Content-Type","text/plain")
-
+                                res.setHeader("Content-Type","text/vtt")
+                                
                                 if(!srtFiles[filename]) srtFiles[filename]=_.find(torrentEngine.files,{name:filename})
                                 
                                 var srtStream=srtFiles[filename].createReadStream()
-
+                                
                                 srtStream.pipe(srt2vtt()).pipe(res)
                             }else if(SUPPORTED_FORMATS.indexOf(ext)>-1&&filename==media.filename){
                                 console.log("piping media")
 
-                                var mediaStream=mediaFile.createReadStream()
+                                var mediaStream
+                                
+                                res.setHeader("Content-Type",type)
+                                
+                                //set the response headers for byte ranges, this is required for seeking
+                                res.setHeader("Accept-Ranges","bytes")
+                                
+                                var range=req.headers.range ? parseRange(mediaFile.length,req.headers.range)[0] : false
+                                var contentLength=mediaFile.length
+
+                                if(range){
+                                    contentLength=range.end-range.start+1
+                                    res.setHeader('Content-Range','bytes '+range.start+'-'+range.end+'/'+mediaFile.length)
+                                    res.statusCode=206
+
+                                    console.log(range)
+                                    
+                                    mediaStream=mediaFile.createReadStream(range)
+                                }else{
+                                    mediaStream=mediaFile.createReadStream()
+                                }
+
+                                res.setHeader('Content-Length',contentLength)
+                                
                                 
                                 mediaStream.pipe(res)
                             }else{
-                                console.log("not found")
+                                console.log("not found: "+filename)
                                 res.end()
                             }
-                            
                         })
                         
                         server.on('connection', function (socket) {
@@ -249,6 +313,7 @@ const app=new Vue({
 
                         server.listen(8080,function(){
                             if(isPlayMedia) self.playMedia(media)
+                            console.log("server is listening",encodeURI(self.getMediaDeliveryPath(media.filename)))
                             self.isServerRunning=true
                         })
                     })
@@ -271,20 +336,10 @@ const app=new Vue({
                     }]
                 }
 
-                console.log(chromecastMedia)
+                console.log(media.currentTime)
 
-                this.currentDevice.play(chromecastMedia,function(e,s){
-                    console.log(e,s)
-                })
-                
-                this.currentDevice.on("status",function(s){
-                    console.log(s)
-                })
-
-                this.currentDevice.on("finished",function(){
-                    if(self.currentPlaylistIndex<self.playlist.length-1){
-                        self.selectMedia(self.currentPlaylistIndex+1)
-                    }
+                this.currentDevice.play(chromecastMedia,{
+                    startTime:media.currentTime || 0
                 })
             }
         },
@@ -293,14 +348,46 @@ const app=new Vue({
 
             if(torrentEngine) torrentEngine.destroy()
             if(server) server.close(function(){
-                self.isServerRunning=false
+                console.log("server closed")
             })
+
+            self.isServerRunning=false
 
             torrentEngine=false
             server=false
         },
         getMediaDeliveryPath:function(filename){
             return "http://" + address() + ":8080/" + filename
+        },
+        startInterval:function(){
+            var self=this
+
+            clearInterval(this.statusInterval)
+            
+            this.statusInterval=setInterval(function(){
+                if(self.currentDevice&&self.currentDevice.player&&self.currentDevice.player.client){
+                    self.currentDevice.player.getStatus(function(e,s){
+                        if(e) console.log(e)
+    
+                        if(s&&self.currentMedia&&s.media){
+                            self.currentMedia.currentTime=s.currentTime
+                            self.currentMedia.duration=s.media.duration
+    
+                            self.storePlaylist()
+                        }
+                    })
+                }
+            },STATUS_INTERVAL_DURATION)
+        },
+        activateSubtitle:function(index){
+            var vidEl=this.$refs.vidEl
+
+            if(vidEl){
+                for(var i=0;i<vidEl.textTracks.length;i++){
+                    if(i==index) vidEl.textTracks[i].mode="showing"
+                    else vidEl.textTracks[i].mode="hidden"
+                }
+            }
         }
     },
     beforeMount:function(){
@@ -309,19 +396,13 @@ const app=new Vue({
         //add devices to device list
         clientDiscovery.on('device',function(device){
             self.devices=clientDiscovery.devices
+
+            if(device.name==self.currentDeviceName){
+                self.selectDevice(device.name)
+            }
         })
 
-        //startup the status interval
-        this.statusInterval=setInterval(function(){
-            if(self.currentDevice&&self.currentDevice.player&&self.currentDevice.player.client){
-                self.currentDevice.player.getStatus(function(e,s){
-                    if(e) console.log(e)
-                    else if(s){
-                        self.currentPlayhead=s.currentTime
-                        if(s.media) self.currentDuration=s.media.duration
-                    }
-                })
-            }
-        },STATUS_INTERVAL_DURATION)
+        //startup the status interval (this gets the status of the chromecast so we can display the current time accurately)
+        this.startInterval()
     }
 })
