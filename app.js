@@ -1,14 +1,11 @@
 const Vue = require('vue/dist/vue.min.js')
 const http = require('http');
-const address = require('network-address')
 const ChromecastAPI = require('chromecast-api')
 const readTorrent = require('read-torrent')
 const torrentStream = require('torrent-stream')
 const _ = require('lodash')
 const mime = require('mime')
-const srt2vtt = require('srt-to-vtt');
-const { forEach } = require('lodash');
-const parseRange = require('range-parser')
+const torplayServer = require('./torplay-server.js')
 
 //supported file formats for chromecast
 const SUPPORTED_FORMATS=["mp4","m4v","webm","mkv"]
@@ -17,15 +14,14 @@ const STATUS_INTERVAL_DURATION=1000
 //this is the client we use to detect chromecast devices
 const clientDiscovery = new ChromecastAPI()
 
-//we use this var to store the torrent engine
-var torrentEngine=false
-//this stores the server instance that server the media files to the devices
-var server=false
+//this is the http server instance we user to deliver media
+const server=new torplayServer()
 
 //init the vue app
 const app=new Vue({
     el:"#app",
     data:{
+        server:server,
         devices:[],
         currentDeviceName:localStorage.currentDeviceName || "", //device name is used as a key to find the current device
         playlist:JSON.parse(localStorage.playlist||"[]"),
@@ -100,8 +96,6 @@ const app=new Vue({
             if(oldDevice) oldDevice.close()
 
             if(newDevice){
-                if(!this.isServerRunning) this.startMediaDelivery(this.currentMedia)
-                
                 newDevice._tryJoin(function(){
                     if(newDevice.player) newDevice.getStatus(function(e,s){
                         console.log(s)
@@ -233,110 +227,22 @@ const app=new Vue({
             this.playbackRate=1
 
             console.log("selecting media: "+mediaIndex)
-
-            this.startMediaDelivery(this.playlist[mediaIndex],true)
-        },
-        startMediaDelivery:function(media,isPlayMedia){
-            var self=this
-
-            console.log("startingServer for: ",media)
-
-            if(media.torrentUrl){
-                readTorrent(media.torrentUrl,function(e,torrent){
-                    if(e) console.log(e)
-
-                    self.resetMediaDelivery()
-                    
-                    torrentEngine=torrentStream(torrent)
-    
-                    torrentEngine.on('ready',function(){
-                        var mediaFile=_.find(torrentEngine.files,{name:media.filename})
-
-                        var srtFiles={}
-
-                        server=http.createServer(function(req, res){
-                            var filename=decodeURI(req.url.substr(req.url.lastIndexOf("/")+1,req.url.length))
-                            var type=mime.getType(req.url)
-                            var ext=mime.getExtension(type)
-
-                            console.log(filename)
-                            
-                            if(ext=='srt'&&media.subtitles.indexOf(filename)>-1){
-                                console.log("piping srt")
-                                
-                                res.setHeader("Access-Control-Allow-Origin","*")
-                                res.setHeader("Content-Type","text/vtt")
-                                
-                                if(!srtFiles[filename]) srtFiles[filename]=_.find(torrentEngine.files,{name:filename})
-                                
-                                var srtStream=srtFiles[filename].createReadStream()
-                                
-                                srtStream.pipe(srt2vtt()).pipe(res)
-                            }else if(SUPPORTED_FORMATS.indexOf(ext)>-1&&filename==media.filename){
-                                console.log("piping media")
-
-                                var mediaStream
-                                
-                                res.setHeader("Content-Type",type)
-                                
-                                //set the response headers for byte ranges, this is required for seeking
-                                res.setHeader("Accept-Ranges","bytes")
-                                
-                                var range=req.headers.range ? parseRange(mediaFile.length,req.headers.range)[0] : false
-                                var contentLength=mediaFile.length
-
-                                if(range){
-                                    contentLength=range.end-range.start+1
-                                    res.setHeader('Content-Range','bytes '+range.start+'-'+range.end+'/'+mediaFile.length)
-                                    res.statusCode=206
-
-                                    console.log(range)
-                                    
-                                    mediaStream=mediaFile.createReadStream(range)
-                                }else{
-                                    mediaStream=mediaFile.createReadStream()
-                                }
-
-                                res.setHeader('Content-Length',contentLength)
-                                
-                                
-                                mediaStream.pipe(res)
-                            }else{
-                                console.log("not found: "+filename)
-                                res.end()
-                            }
-                        })
-                        
-                        server.on('connection', function (socket) {
-                            socket.setTimeout(36000000)
-                        })
-
-                        server.listen(8080,function(){
-                            if(isPlayMedia) self.playMedia(media)
-                            console.log("server is listening",encodeURI(self.getMediaDeliveryPath(media.filename)))
-                            self.isServerRunning=true
-                        })
-                    })
-                })
-            }
         },
         playMedia:function(media){
             var self=this
-            var mediaDeliveryPath=this.getMediaDeliveryPath(media.filename)
+            var mediaDeliveryPath=this.getMediaDeliveryPath(media.filename,media.torrentUrl)
     
             if(this.currentDevice){
                 var chromecastMedia={
                     url:mediaDeliveryPath,
                     subtitles:media.subtitles.length ? _.map(media.subtitles,function(s){
                         return {
-                            url:self.getMediaDeliveryPath(s)
+                            url:self.getMediaDeliveryPath(s,media.torrentUrl)
                         }
                     }) : [{
-                        url:self.getMediaDeliveryPath("no-srt.srt")
+                        url:self.getMediaDeliveryPath("no-srt.srt",media.torrentUrl)
                     }]
                 }
-
-                console.log(media.currentTime)
 
                 this.currentDevice.play(chromecastMedia,{
                     startTime:media.currentTime || 0
@@ -356,8 +262,8 @@ const app=new Vue({
             torrentEngine=false
             server=false
         },
-        getMediaDeliveryPath:function(filename){
-            return "http://" + address() + ":8080/" + filename
+        getMediaDeliveryPath:function(filename,torrentUrl){
+            return this.server.getMediaDeliveryPath(filename,torrentUrl)
         },
         startInterval:function(){
             var self=this
@@ -401,6 +307,8 @@ const app=new Vue({
                 self.selectDevice(device.name)
             }
         })
+
+        this.server.listen(8080)
 
         //startup the status interval (this gets the status of the chromecast so we can display the current time accurately)
         this.startInterval()
