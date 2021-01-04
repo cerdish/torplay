@@ -6,9 +6,12 @@ const _ = require('lodash')
 const mime = require('mime')
 const torplayServer = require('./torplay-server.js')
 const seconds2timecode = require('seconds2timecode')
+const validUrl = require('valid-url')
+const url = require('url')
+const { FunctionalRenderContext } = require('vue/dist/vue.min.js')
 
 //supported file formats for chromecast
-const SUPPORTED_FORMATS=["mp4","m4v","webm","mkv"]
+const SUPPORTED_MEDIA_FORMATS=["mp4","m4v","webm","mkv"]
 const STATUS_INTERVAL_DURATION=1000
 
 //this is the client we use to detect chromecast devices
@@ -31,7 +34,7 @@ const app=new Vue({
         playbackRate:1,
         currentDeviceStatus:"DISCONNECTED",
         overlayComponent:false,
-        mediaEditorId:-1
+        mediaEditorIndex:-1
     },
     computed:{
         currentDevice:function(){
@@ -172,6 +175,10 @@ const app=new Vue({
         storePlaylist:function(){
             localStorage.playlist=JSON.stringify(this.playlist)
         },
+        editMedia:function(mIndex){
+            this.mediaEditorIndex=mIndex
+            this.overlayComponent="editMedia"
+        },
         selectMedia:function(mediaIndex){
             this.currentPlaylistIndex=mediaIndex
             this.currentCCIndex=-1
@@ -183,19 +190,18 @@ const app=new Vue({
         },
         playMedia:function(media){
             var self=this
-            var mediaDeliveryPath=this.getMediaDeliveryPath(media.filename,media.torrentUrl)
+            var mediaDeliveryPath=this.getMediaDeliveryPath(media)
 
             if(this.currentDevice){
                 var chromecastMedia={
-                    url:mediaDeliveryPath,
-                    subtitles:media.subtitles.length ? _.map(media.subtitles,function(s){
-                        return {
-                            url:self.getMediaDeliveryPath(s,media.torrentUrl)
-                        }
-                    }) : [{
-                        url:self.getMediaDeliveryPath("no-srt",media.torrentUrl)
-                    }]
+                    url:mediaDeliveryPath
                 }
+
+                if(media.subtitles.length) chromecastMedia.subtitles=_.map(media.subtitles,function(s){
+                    return {
+                        url:self.getMediaDeliveryPath(s)
+                    }
+                })
 
                 this.currentDeviceStatus="CONNECTING"
 
@@ -204,8 +210,8 @@ const app=new Vue({
                 })
             }
         },
-        getMediaDeliveryPath:function(filename,torrentUrl){
-            return this.server.getMediaDeliveryPath(filename,torrentUrl)
+        getMediaDeliveryPath:function(file){
+            return this.server.getMediaDeliveryPath(file)
         },
         startInterval:function(){
             var self=this
@@ -263,6 +269,40 @@ const app=new Vue({
     }
 })
 
+Vue.component('playlist',{
+    template:"#playlist_template",
+    data:function(){
+        return {}
+    },
+    methods:{
+
+    },
+    props:["playlist"],
+    mounted:function(){
+        this.$refs.playlistUl.addEventListener('drop', (e) => {
+            e.preventDefault()
+            e.stopPropagation()
+        
+            for(const f of e.dataTransfer.files){
+                var type=mime.getType(f.path)
+                var ext=mime.getExtension(type)
+        
+                if(SUPPORTED_MEDIA_FORMATS.indexOf(ext)>-1) this.$root.addMediaToPlaylist({
+                    filename:f.path.substr(f.path.lastIndexOf("\\")+1),
+                    filePath:f.path,
+                    subtitles:[],
+                    currentTime:0,
+                    duration:0
+                })
+            }
+        })
+        this.$refs.playlistUl.addEventListener('dragover', (e) => {
+            e.preventDefault()
+            e.stopPropagation()
+        })
+    }
+})
+
 Vue.component('addTorrentMedia',{
     template:"#addTorrentMedia_template",
     data:function(){
@@ -280,7 +320,7 @@ Vue.component('addTorrentMedia',{
             return _.filter(this.torrentFiles,function(f){
                 var ext=mime.getExtension(mime.getType(f.name))
 
-                return SUPPORTED_FORMATS.indexOf(ext)>-1
+                return SUPPORTED_MEDIA_FORMATS.indexOf(ext)>-1
             })
         }
     },
@@ -342,19 +382,80 @@ Vue.component('addTorrentMedia',{
         },
         addTorrentFileToPlaylist:function(filename){
             var noExtName=filename.substr(0,filename.lastIndexOf("."))
+            
+            var self=this
 
             var subtitles=_.map(_.filter(this.torrentFiles,function(f){
                 var ext=mime.getExtension(mime.getType(f.name))
                 
                 return ext=="srt"&&f.name.indexOf(noExtName)>-1
             }),function(f){
-                return f.name
+                return {
+                    filename:f.name,
+                    torrentUrl:self.torrentUrl
+                }
             })
 
             this.$root.addMediaToPlaylist({torrentUrl:this.torrentUrl,filename:filename,subtitles:subtitles,currentTime:0,duration:0})
         }
+    }
+})
+
+Vue.component('editMedia',{
+    template:"#editMedia_template",
+    data:function(){
+        return {
+            newSubtitlesUrl:""
+        }
+    },
+    computed:{
+        media:function(){
+            var mIndex=this.$root.mediaEditorIndex
+
+            if(mIndex>-1){
+                var media=this.$root.playlist[mIndex]
+
+                if(media) return media
+            }
+
+            return false
+        }
+    },
+    methods:{
+        addSubtitles:function(subtitleUrl){
+            if(validUrl.isUri(subtitleUrl)){
+                var urlInfo=url.parse(subtitleUrl,true)
+
+                console.log(urlInfo)
+
+                this.media.subtitles.push({
+                    filename:urlInfo.pathname.substr(urlInfo.pathname.lastIndexOf("/")+1)+(urlInfo.search || ""),
+                    httpUrl:subtitleUrl
+                })
+            }
+        },
+        removeSubtitles:function(sIndex){
+            this.media.subtitles.splice(sIndex,1)
+        }
     },
     mounted:function(){
-        //if(this.torrentUrl) this.getTorrentFileList(this.torrentUrl)
+        this.$refs.subtitlesUl.addEventListener('drop', (e) => {
+            e.preventDefault()
+            e.stopPropagation()
+        
+            for(const f of e.dataTransfer.files){
+                var type=mime.getType(f.path)
+                var ext=mime.getExtension(type)
+        
+                if(ext=="srt"||ext=="vtt") this.media.subtitles.push({
+                    filename:f.path.substr(f.path.lastIndexOf("\\")+1),
+                    filePath:f.path
+                })
+            }
+        })
+        this.$refs.subtitlesUl.addEventListener('dragover', (e) => {
+            e.preventDefault()
+            e.stopPropagation()
+        })
     }
 })

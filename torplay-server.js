@@ -7,6 +7,10 @@ const readTorrent = require('read-torrent')
 const torrentStream = require('torrent-stream')
 const srt2vtt = require('srt-to-vtt')
 const parseRange = require('range-parser')
+const axios = require('axios')
+const fs = require('fs')
+
+axios.defaults.adapter = require('axios/lib/adapters/http')
 
 const SUPPORTED_MEDIA_FORMATS=["mp4","m4v","webm","mkv"]
 
@@ -24,10 +28,12 @@ function torplayServer(){
         const filename=decodeURI(pathname.substr(pathname.lastIndexOf("/")+1,req.url.length))
         const type=mime.getType(filename)
         const ext=mime.getExtension(type)
-
+        
         console.log("starting request: "+filename+" range: "+req.headers.range)
 
         const torrentUrl=urlInfo.query.torrentUrl ? atob(urlInfo.query.torrentUrl) : false
+        const httpUrl=urlInfo.query.httpUrl ? atob(urlInfo.query.httpUrl) : false
+        const filePath=urlInfo.query.filePath ? atob(urlInfo.query.filePath) : false
 
         if(torrentUrl){
             var torrentEngine=self.torrentEngine
@@ -44,6 +50,10 @@ function torplayServer(){
                     self.startEngine(torrentUrl,self.handleTorrentReq.bind(self),[req,res,filename,ext,type])
                 }
             }
+        }else if(httpUrl){
+            self.handleHttpReq(httpUrl,req,res,filename,ext,type)
+        }else if(filePath){
+            self.handleFileReq(filePath,req,res,filename,ext,type)
         }else{
             self.handleNotFoundReq(req,res,filename)
         }
@@ -85,58 +95,108 @@ torplayServer.prototype.listen = function (port,callback) {
 }
 
 torplayServer.prototype.handleTorrentReq = function (req,res,filename,ext,type){
-    var self=this
-
     if(SUPPORTED_MEDIA_FORMATS.indexOf(ext)>-1){
-        var mediaFile=_.find(self.torrentEngine.files,{name:filename})
+        var mediaFile=_.find(this.torrentEngine.files,{name:filename})
         var mediaStream=false
 
         //if we don't find the file then we return not found and return
         if(!mediaFile){
-            self.handleNotFoundReq(req,res,filename)
+            this.handleNotFoundReq(req,res,filename)
             return false
         }
 
-        console.log("piping media")
-        
-        res.setHeader("Content-Type",type)
-        
-        //set the response headers for byte ranges, this is required for seeking
-        res.setHeader("Accept-Ranges","bytes")
-        
-        //calculate the range of bytes to return
+        //calculate the range of bytes to return based on headers
         var range=req.headers.range ? parseRange(mediaFile.length,req.headers.range)[0] : false
-        var contentLength=mediaFile.length
 
-        if(range){
-            contentLength=range.end-range.start+1
-            res.setHeader('Content-Range','bytes '+range.start+'-'+range.end+'/'+mediaFile.length)
-            res.statusCode=206
-            
-            mediaStream=mediaFile.createReadStream(range)
-        }else{
-            mediaStream=mediaFile.createReadStream()
-        }
+        mediaStream=mediaFile.createReadStream(range ? range : null)
 
-        res.setHeader('Content-Length',contentLength)
-
-        mediaStream.pipe(res)
-    }else if(ext=='srt'){
-        var srtFile=_.find(self.torrentEngine.files,{name:filename})
+        this.deliverMedia(mediaStream,req,res,filename,ext,type,mediaFile.length,range)
+    }else if(ext=='srt'||ext=='vtt'){
+        var srtFile=_.find(this.torrentEngine.files,{name:filename})
 
         if(!srtFile){
             this.handleNotFoundReq(req,res,filename)
             return false
         }
 
-        console.log("piping srt")
-        
-        res.setHeader("Access-Control-Allow-Origin","*")
-        res.setHeader("Content-Type","text/vtt")
-        
         var srtStream=srtFile.createReadStream()
+
+        this.deliverSubtitles(srtStream,req,res,filename,ext,type)
+    }
+}
+
+torplayServer.prototype.handleHttpReq = function (httpUrl,req,res,filename,ext,type){
+    var self=this
+    
+    axios({
+        method:"get",
+        url:httpUrl,
+        responseType:'stream'
+    }).then(function(axiosRes){
+        console.log(axiosRes)
+
+        if(SUPPORTED_MEDIA_FORMATS.indexOf(ext)>-1){
+            self.deliverMedia(axiosRes.data,req,res,filename,ext,type,axiosRes.headers["content-length"],false)
+        }else if(ext=='srt'||ext=='vtt'){
+            self.deliverSubtitles(axiosRes.data,req,res,filename,ext,type)
+        }else{
+            self.handleNotFoundReq(req,res,filename)
+        }
+    }).catch(function(e){
+        console.log(e)
+        self.handleNotFoundReq(req,res,filename)
+    })
+}
+
+torplayServer.prototype.handleFileReq = function (filePath,req,res,filename,ext,type){
+    //calculate the range of bytes to return based on headers
+    var fileSize=fs.statSync(filePath).size
+
+    var range=req.headers.range ? parseRange(fileSize,req.headers.range)[0] : false
+
+    var fileStream=fs.createReadStream(filePath,range ? range : null)
+
+
+    if(SUPPORTED_MEDIA_FORMATS.indexOf(ext)>-1){
+        this.deliverMedia(fileStream,req,res,filename,ext,type,fileSize,range)
+    }else if(ext=='srt'||ext=='vtt'){
+        this.deliverSubtitles(fileStream,req,res,filename,ext,type)
+    }else{
+        this.handleNotFoundReq(req,res,filename)
+    }
+}
+
+torplayServer.prototype.deliverMedia = function (stream,req,res,filename,ext,type,fileSize,range){
+    console.log("piping media")
+    
+    res.setHeader("Content-Type",type)
+    
+    //set the response headers for byte ranges, this is required for seeking
+    res.setHeader("Accept-Ranges","bytes")
+    
+    var contentLength=fileSize
+
+    if(range){
+        contentLength=range.end-range.start+1
+        res.setHeader('Content-Range','bytes '+range.start+'-'+range.end+'/'+fileSize)
+        res.statusCode=206
+    }
+    
+    res.setHeader('Content-Length',contentLength)
+    
+    stream.pipe(res)
+}
+
+torplayServer.prototype.deliverSubtitles = function (stream,req,res,filename,ext,type){
+    console.log("piping srt")
         
-        srtStream.pipe(srt2vtt()).pipe(res)
+    res.setHeader("Access-Control-Allow-Origin","*")
+    res.setHeader("Content-Type","text/vtt")
+
+    if(ext=="srt"){
+        stream.pipe(srt2vtt()).pipe(res)
+    }else{
+        stream.pipe(res)
     }
 }
 
@@ -157,11 +217,23 @@ torplayServer.prototype.close = function (callback) {
     })
 }
 
-torplayServer.prototype.getMediaDeliveryPath = function (filename,torrentUrl){
-    var mediaDeliveryPath="http://" + address() + ":8080/" + filename
+torplayServer.prototype.getMediaDeliveryPath = function (file){
+    var mediaDeliveryPath="http://" + address() + ":8080/" + file.filename
+    
+    var type=mime.getType(file.filename)
+    var ext=mime.getExtension(type)
 
-    if(torrentUrl) mediaDeliveryPath+="?torrentUrl=" + encodeURI(btoa(torrentUrl))
+    if(file.torrentUrl) mediaDeliveryPath+="?torrentUrl=" + encodeURI(btoa(file.torrentUrl))
 
+    if(file.httpUrl){
+        if(ext=="srt") mediaDeliveryPath+="?httpUrl=" + encodeURI(btoa(file.httpUrl))
+        else mediaDeliveryPath=file.httpUrl
+    }
+
+    if(file.filePath) mediaDeliveryPath+="?filePath=" + encodeURI(btoa(file.filePath))
+
+    console.log(mediaDeliveryPath)
+    
     return mediaDeliveryPath 
 }
 

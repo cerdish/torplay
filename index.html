@@ -16,45 +16,7 @@
 			</section>
 
 			<div v-else>
-				<section class="playlist">
-					<h1>Playlist</h1>
-
-					<ul class="playlist is-blocks">
-						<li v-if="!playlist.length">
-							<div class="pad center">
-								No media
-							</div>
-						</li>
-
-						<li v-for="media,mIndex in playlist" v-else>
-							<button class="is-block" :class="{active:currentPlaylistIndex==mIndex}" @click="selectMedia(mIndex)">
-								<div class="flex">
-									<div class="item-flex ellipsis-overflow v-center">
-										<span>{{media.filename}}</span>
-
-										<i class="material-icons light-grey small" v-if="media.subtitles.length">closed_caption</i>
-									</div>
-
-									<div class="pad-l">
-										<a class="list-btn" @click.stop="console.log('test')">
-											<i class="material-icons">edit</i>
-										</a>
-									</div>
-
-									<div style="margin:-0.5em 0;" class="pad-l">
-										<a class="list-btn red" @click.stop="removeMediaFromPlaylist(mIndex)">
-											<i class="material-icons">cancel</i>
-										</a>
-									</div>
-								</div>
-							</button>
-						</li>
-					</ul>
-
-					<div class="pad-t right">
-						<button @click="overlayComponent='addTorrentMedia'">Add from torrent</button>
-					</div>
-				</section>
+				<playlist :playlist="playlist"></playlist>
 
 				<section class="device-control" v-if="currentMedia" :key="currentMedia.filename">
 					<div class="flex">
@@ -125,7 +87,7 @@
 									cc:
 									<select :disabled="isControlsDisabled" v-model="currentCcIndex">
 										<option value="-1">off</option>
-										<option v-for="cc,ccIndex in currentMedia.subtitles" :value="ccIndex">{{cc}}</option>
+										<option v-for="cc,ccIndex in currentMedia.subtitles" :value="ccIndex">{{cc.filename}}</option>
 									</select>
 								</label>
 							</div>
@@ -133,8 +95,8 @@
 					</div>
 
 					<div v-else>
-						<video ref="vidEl" :src="getMediaDeliveryPath(currentMedia.filename,currentMedia.torrentUrl)" controls style="width:100%;" autoplay>
-							<track v-for="subtitle in currentMedia.subtitles" :src="getMediaDeliveryPath(subtitle,currentMedia.torrentUrl)" :label="subtitle">
+						<video ref="vidEl" :src="getMediaDeliveryPath(currentMedia)" controls style="width:100%;" autoplay>
+							<track v-for="subtitle in currentMedia.subtitles" :src="getMediaDeliveryPath(subtitle)" :label="subtitle">
 						</video>
 
 						<div>
@@ -142,7 +104,7 @@
 								cc:
 								<select @change="activateSubtitle($event.target.value)">
 									<option value="-1">off</option>
-									<option v-for="cc,ccIndex in currentMedia.subtitles" :value="ccIndex">{{cc}}</option>
+									<option v-for="cc,ccIndex in currentMedia.subtitles" :value="ccIndex">{{cc.filename}}</option>
 								</select>
 							</label>
 						</div>
@@ -160,9 +122,51 @@
 		</main>
 
 		<!--- components --->
+		<script type="text/x-template" id="playlist_template">
+			<section class="playlist">
+				<h1>Playlist</h1>
+
+				<ul class="playlist is-blocks" ref="playlistUl">
+					<li v-if="!playlist.length">
+						<div class="pad center">
+							No media
+						</div>
+					</li>
+
+					<li v-for="media,mIndex in playlist" v-else>
+						<button class="is-block" :class="{active:$root.currentPlaylistIndex==mIndex}" @click="$root.selectMedia(mIndex)">
+							<div class="flex">
+								<div class="item-flex ellipsis-overflow v-center">
+									<span>{{media.filename}}</span>
+
+									<i class="material-icons light-grey small" v-if="media.subtitles.length">closed_caption</i>
+								</div>
+
+								<div class="pad-l">
+									<a class="list-btn" @click.stop="$root.editMedia(mIndex)">
+										<i class="material-icons">edit</i>
+									</a>
+								</div>
+
+								<div style="margin:-0.5em 0;" class="pad-l">
+									<a class="list-btn red" @click.stop="$root.removeMediaFromPlaylist(mIndex)">
+										<i class="material-icons">cancel</i>
+									</a>
+								</div>
+							</div>
+						</button>
+					</li>
+				</ul>
+
+				<div class="pad-t right">
+					<button @click="$root.overlayComponent='addTorrentMedia'">Add from torrent</button>
+				</div>
+			</section>
+		</script>
+				
 		<script type="text/x-template" id="addTorrentMedia_template">
 			<div class="add-torrent-media">
-				<h1>Torrent:</h1>
+				<h1>Torrent / Magnet</h1>
 
 				<div class="flex">
 					<div class="item-flex has-dropdown">
@@ -205,6 +209,50 @@
 						<button :disabled="!torrentFiles.length" @click="addAllTorrentFiles()">Add All</button>
 						<button :disabled="!torrentFiles.length||!selectedTorrentFiles.length" @click="addSelectedTorrentFiles()">Add Selected</button>
 						<button @click="$root.overlayComponent=false">Cancel</button>
+					</div>
+				</div>
+			</div>
+		</script>
+
+		<script type="text/x-template" id="editMedia_template">
+			<div class="edit-media">
+				<h1>Edit Media</h1>
+
+				<div style="word-break:break-all;">{{media.filename}}</div>
+
+				<h2>Subtitles</h2>
+
+				<ul class="is-blocks" ref="subtitlesUl">
+					<li v-if="!media.subtitles.length">
+						<div class="pad center">
+							No subtitles found
+						</div>
+					</li>
+
+					<li v-for="subtitles,sIndex in media.subtitles">
+						<button class="is-block">
+							<div class="flex">
+								<div class="item-flex">
+									{{subtitles.filename}}
+								</div>
+
+								<div class="pad-l">
+									<a @click="removeSubtitles(sIndex)">
+										<i class="material-icons small red">close</i>
+									</a>
+								</div>
+							</div>
+						</button>
+					</li>
+				</ul>
+
+				<div class="pad-t flex">
+					<div class="item-flex">
+						<input type="text" v-model="newSubtitlesUrl">
+					</div>
+
+					<div>
+						<button @click="addSubtitles(newSubtitlesUrl)">Add Subtitles</button>
 					</div>
 				</div>
 			</div>
