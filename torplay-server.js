@@ -13,6 +13,8 @@ const fs = require('fs')
 axios.defaults.adapter = require('axios/lib/adapters/http')
 
 const SUPPORTED_MEDIA_FORMATS=["mp4","m4v","webm","mkv"]
+const SUPPORTED_SRT_FORMATS=["srt","vtt"]
+const SUPPORTED_FILE_FORMATS=["jpg,gif,png"]
 
 function torplayServer(){
     var self=this
@@ -95,33 +97,31 @@ torplayServer.prototype.listen = function (port,callback) {
 }
 
 torplayServer.prototype.handleTorrentReq = function (req,res,filename,ext,type){
+    var torrentFile=_.find(this.torrentEngine.files,{name:filename})
+
+    //if we don't find the file then we return not found and return
+    if(!torrentFile){
+        this.handleNotFoundReq(req,res,filename)
+        return false
+    }
+
     if(SUPPORTED_MEDIA_FORMATS.indexOf(ext)>-1){
-        var mediaFile=_.find(this.torrentEngine.files,{name:filename})
-        var mediaStream=false
-
-        //if we don't find the file then we return not found and return
-        if(!mediaFile){
-            this.handleNotFoundReq(req,res,filename)
-            return false
-        }
-
         //calculate the range of bytes to return based on headers
-        var range=req.headers.range ? parseRange(mediaFile.length,req.headers.range)[0] : false
+        var range=req.headers.range ? parseRange(torrentFile.length,req.headers.range)[0] : false
 
-        mediaStream=mediaFile.createReadStream(range ? range : null)
+        var stream=torrentFile.createReadStream(range ? range : null)
 
-        this.deliverMedia(mediaStream,req,res,filename,ext,type,mediaFile.length,range)
-    }else if(ext=='srt'||ext=='vtt'){
-        var srtFile=_.find(this.torrentEngine.files,{name:filename})
+        this.deliverMedia(stream,req,res,filename,ext,type,torrentFile.length,range)
+    }else if(SUPPORTED_SRT_FORMATS.indexOf(ext)>-1){
+        var stream=torrentFile.createReadStream()
 
-        if(!srtFile){
-            this.handleNotFoundReq(req,res,filename)
-            return false
-        }
+        this.deliverSubtitles(stream,req,res,filename,ext,type)
+    }else if(SUPPORTED_FILE_FORMATS.indexOf(ext)>-1){
+        var stream=torrentFile.createReadStream()
 
-        var srtStream=srtFile.createReadStream()
-
-        this.deliverSubtitles(srtStream,req,res,filename,ext,type)
+        this.deliverFile(stream,req,res,filename,ext,type)
+    }else{
+        this.handleNotFoundReq(req,res,filename)
     }
 }
 
@@ -137,8 +137,10 @@ torplayServer.prototype.handleHttpReq = function (httpUrl,req,res,filename,ext,t
 
         if(SUPPORTED_MEDIA_FORMATS.indexOf(ext)>-1){
             self.deliverMedia(axiosRes.data,req,res,filename,ext,type,axiosRes.headers["content-length"],false)
-        }else if(ext=='srt'||ext=='vtt'){
+        }else if(SUPPORTED_SRT_FORMATS.indexOf(ext)>-1){
             self.deliverSubtitles(axiosRes.data,req,res,filename,ext,type)
+        }else if(SUPPORTED_FILE_FORMATS.indexOf(ext)>-1){
+            self.deliverFile(axiosRes.data,req,res,filename,ext,type)
         }else{
             self.handleNotFoundReq(req,res,filename)
         }
@@ -149,21 +151,34 @@ torplayServer.prototype.handleHttpReq = function (httpUrl,req,res,filename,ext,t
 }
 
 torplayServer.prototype.handleFileReq = function (filePath,req,res,filename,ext,type){
+    var self=this
+
     //calculate the range of bytes to return based on headers
     var fileSize=fs.statSync(filePath).size
 
     var range=req.headers.range ? parseRange(fileSize,req.headers.range)[0] : false
 
+    console.log(range,fileSize)
+
     var fileStream=fs.createReadStream(filePath,range ? range : null)
 
+    fileStream.on("error",function(e){
+        console.log(e)
+    })
 
-    if(SUPPORTED_MEDIA_FORMATS.indexOf(ext)>-1){
-        this.deliverMedia(fileStream,req,res,filename,ext,type,fileSize,range)
-    }else if(ext=='srt'||ext=='vtt'){
-        this.deliverSubtitles(fileStream,req,res,filename,ext,type)
-    }else{
-        this.handleNotFoundReq(req,res,filename)
-    }
+    fileStream.on('open',function(){
+        console.log("stream openned")
+        
+        if(SUPPORTED_MEDIA_FORMATS.indexOf(ext)>-1){
+            self.deliverMedia(fileStream,req,res,filename,ext,type,fileSize,range)
+        }else if(SUPPORTED_SRT_FORMATS.indexOf(ext)>-1){
+            self.deliverSubtitles(fileStream,req,res,filename,ext,type)
+        }else if(SUPPORTED_FILE_FORMATS.indexOf(ext)>-1){
+            self.deliverFile(axiosRes.data,req,res,filename,ext,type)
+        }else{
+            self.handleNotFoundReq(req,res,filename)
+        }
+    })
 }
 
 torplayServer.prototype.deliverMedia = function (stream,req,res,filename,ext,type,fileSize,range){
@@ -189,7 +204,7 @@ torplayServer.prototype.deliverMedia = function (stream,req,res,filename,ext,typ
 
 torplayServer.prototype.deliverSubtitles = function (stream,req,res,filename,ext,type){
     console.log("piping srt")
-        
+
     res.setHeader("Access-Control-Allow-Origin","*")
     res.setHeader("Content-Type","text/vtt")
 
@@ -198,6 +213,15 @@ torplayServer.prototype.deliverSubtitles = function (stream,req,res,filename,ext
     }else{
         stream.pipe(res)
     }
+}
+
+torplayServer.prototype.deliverFile = function (stream,req,res,filename,ext,type){
+    console.log("piping file")
+        
+    res.setHeader("Access-Control-Allow-Origin","*")
+    res.setHeader("Content-Type",type)
+
+    stream.pipe(res)
 }
 
 torplayServer.prototype.handleNotFoundReq = function (req,res,filename){
