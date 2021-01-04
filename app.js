@@ -6,6 +6,7 @@ const torrentStream = require('torrent-stream')
 const _ = require('lodash')
 const mime = require('mime')
 const torplayServer = require('./torplay-server.js')
+const seconds2timecode = require('seconds2timecode')
 
 //supported file formats for chromecast
 const SUPPORTED_FORMATS=["mp4","m4v","webm","mkv"]
@@ -65,6 +66,11 @@ const app=new Vue({
             if(this.currentPlaylistIndex>-1&&this.currentPlaylistIndex<this.playlist.length) return this.playlist[this.currentPlaylistIndex]
 
             return false
+        },
+        isShowDeviceControls:function(){
+            var status=this.currentDeviceStatus
+
+            return !!["PLAYING,BUFFERING,PAUSED"].indexOf(status) > -1
         }
     },
     watch:{
@@ -91,7 +97,7 @@ const app=new Vue({
             var self=this
 
             //if there is already a device set (not local machine) close that connection
-            if(oldDevice) oldDevice.close()
+            if(oldDevice) this.closeDeviceConnection(oldDevice)
 
             if(newDevice){
                 newDevice._tryJoin(function(){
@@ -127,7 +133,6 @@ const app=new Vue({
                 
                 device.on("status",function(s){
                     self.currentDeviceStatus=s.playerState
-                    console.log(s)
                 })
     
                 device.on("finished",function(){
@@ -231,7 +236,7 @@ const app=new Vue({
         playMedia:function(media){
             var self=this
             var mediaDeliveryPath=this.getMediaDeliveryPath(media.filename,media.torrentUrl)
-    
+
             if(this.currentDevice){
                 var chromecastMedia={
                     url:mediaDeliveryPath,
@@ -240,9 +245,11 @@ const app=new Vue({
                             url:self.getMediaDeliveryPath(s,media.torrentUrl)
                         }
                     }) : [{
-                        url:self.getMediaDeliveryPath("no-srt.srt",media.torrentUrl)
+                        url:self.getMediaDeliveryPath("no-srt",media.torrentUrl)
                     }]
                 }
+
+                this.currentDeviceStatus="CONNECTING"
 
                 this.currentDevice.play(chromecastMedia,{
                     startTime:media.currentTime || 0
@@ -282,9 +289,12 @@ const app=new Vue({
                     else vidEl.textTracks[i].mode="hidden"
                 }
             }
+        },
+        seconds2timecode:function(seconds){
+            return seconds2timecode(seconds,1)
         }
     },
-    beforeMount:function(){
+    mounted:function(){
         var self=this
 
         //add devices to device list

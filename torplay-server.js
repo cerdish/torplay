@@ -25,9 +25,9 @@ function torplayServer(){
         const type=mime.getType(filename)
         const ext=mime.getExtension(type)
 
-        console.log("starting request: "+filename)
+        console.log("starting request: "+filename+" range: "+req.headers.range)
 
-        const torrentUrl=urlInfo.query.torrentUrl || false
+        const torrentUrl=urlInfo.query.torrentUrl ? atob(urlInfo.query.torrentUrl) : false
 
         if(torrentUrl){
             var torrentEngine=self.torrentEngine
@@ -112,8 +112,6 @@ torplayServer.prototype.handleTorrentReq = function (req,res,filename,ext,type){
             contentLength=range.end-range.start+1
             res.setHeader('Content-Range','bytes '+range.start+'-'+range.end+'/'+mediaFile.length)
             res.statusCode=206
-
-            console.log(range)
             
             mediaStream=mediaFile.createReadStream(range)
         }else{
@@ -121,8 +119,6 @@ torplayServer.prototype.handleTorrentReq = function (req,res,filename,ext,type){
         }
 
         res.setHeader('Content-Length',contentLength)
-
-        console.log(res.statusCode,contentLength,res,req)
 
         mediaStream.pipe(res)
     }else if(ext=='srt'){
@@ -164,7 +160,7 @@ torplayServer.prototype.close = function (callback) {
 torplayServer.prototype.getMediaDeliveryPath = function (filename,torrentUrl){
     var mediaDeliveryPath="http://" + address() + ":8080/" + filename
 
-    if(torrentUrl) mediaDeliveryPath+="?torrentUrl=" + encodeURI(torrentUrl)
+    if(torrentUrl) mediaDeliveryPath+="?torrentUrl=" + encodeURI(btoa(torrentUrl))
 
     return mediaDeliveryPath 
 }

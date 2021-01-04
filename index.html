@@ -74,35 +74,49 @@
 							<button @click="playMedia(currentMedia)">launch media receiver</button>
 						</div>
 		
-						<div v-else>
+						<div v-else-if="isShowDeviceControls">
 							<div>
 								<input type="range" min="0" :max="currentMedia.duration" step="1" v-model="currentMedia.currentTime" @change="currentDevice.seekTo($event.target.value)">
 							</div>
 
-							<button @click="currentDevice.resume()">resume</button>
-							<button @click="currentDevice.pause()">pause</button>
-							<button @click="currentDeviceName=''">stop</button>
-							
-							{{Math.round(currentMedia.currentTime)}} / {{Math.round(currentMedia.duration)}}
-		
-							<label>
-								playback rate:
-								<select @change="currentDevice.setPlaybackRate($event.target.value)">
-									<option selected>1</option>
-									<option>1.5</option>
-									<option>2</option>
-									<option>5</option>
-									<option>10</option>
-								</select>
-							</label>
-							
-							<label v-if="currentMedia.subtitles.length">
-								cc:
-								<select v-model="currentCcIndex">
-									<option value="-1">off</option>
-									<option v-for="cc,ccIndex in currentMedia.subtitles" :value="ccIndex">{{cc}}</option>
-								</select>
-							</label>
+							<div class="flex">
+								<div v-if="currentDeviceStatus=='PAUSED'">
+									<button class="a" @click="currentDevice.resume()">
+										<i class="material-icons">play_circle</i>
+									</button>
+								</div>
+
+								<div v-else>
+									<button class="a" @click="currentDevice.pause()"><i class="material-icons">pause_circle</i></button>
+								</div>
+
+								<div>
+									<button class="a" @click="closeDeviceConnection()"><i class="material-icons">cancel</i></button>
+								</div>
+
+								<div class="pad">
+									{{seconds2timecode(currentMedia.currentTime)}} / {{seconds2timecode(currentMedia.duration)}}
+								</div>
+
+								<!---label class="pad">
+									playback rate:
+									<select @change="currentDevice.setPlaybackRate($event.target.value)">
+										<option selected>1</option>
+										<option>1.5</option>
+										<option>2</option>
+										<option>5</option>
+										<option>10</option>
+									</select>
+								</label--->
+
+								<label class="pad" v-if="currentMedia.subtitles.length">
+									cc:
+									<select v-model="currentCcIndex">
+										<option value="-1">off</option>
+										<option v-for="cc,ccIndex in currentMedia.subtitles" :value="ccIndex">{{cc}}</option>
+									</select>
+								</label>
+							</div>
 						</div>
 					</div>
 
