@@ -122,9 +122,11 @@ torplayServer.prototype.handleTorrentReq = function (req,res,filename,ext,type){
 
         res.setHeader('Content-Length',contentLength)
 
+        console.log(res.statusCode,contentLength,res,req)
+
         mediaStream.pipe(res)
     }else if(ext=='srt'){
-        var srtFile=_.find(torrentEngine.files,{name:filename})
+        var srtFile=_.find(self.torrentEngine.files,{name:filename})
 
         if(!srtFile){
             this.handleNotFoundReq(req,res,filename)

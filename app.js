@@ -31,13 +31,11 @@ const app=new Vue({
         torrentFiles:[],
         selectedTorrentFiles:[],
         mediaDeliveryPath:"",
-        isServerRunning:false,
         currentCcIndex:-1,
         seekTo:0,
         statusInterval:false,
         playbackRate:1,
-        currentDeviceStatus:"DISCONNECTED",
-        currentServerStatus:"STOPPED"
+        currentDeviceStatus:"DISCONNECTED"
     },
     computed:{
         currentDevice:function(){
@@ -98,7 +96,6 @@ const app=new Vue({
             if(newDevice){
                 newDevice._tryJoin(function(){
                     if(newDevice.player) newDevice.getStatus(function(e,s){
-                        console.log(s)
                         if(s) self.currentDeviceStatus=s.playerState
                     })
                 })
@@ -130,6 +127,7 @@ const app=new Vue({
                 
                 device.on("status",function(s){
                     self.currentDeviceStatus=s.playerState
+                    console.log(s)
                 })
     
                 device.on("finished",function(){
@@ -227,6 +225,8 @@ const app=new Vue({
             this.playbackRate=1
 
             console.log("selecting media: "+mediaIndex)
+
+            this.playMedia(this.playlist[this.currentPlaylistIndex])
         },
         playMedia:function(media){
             var self=this
@@ -248,19 +248,6 @@ const app=new Vue({
                     startTime:media.currentTime || 0
                 })
             }
-        },
-        resetMediaDelivery:function(){
-            var self=this
-
-            if(torrentEngine) torrentEngine.destroy()
-            if(server) server.close(function(){
-                console.log("server closed")
-            })
-
-            self.isServerRunning=false
-
-            torrentEngine=false
-            server=false
         },
         getMediaDeliveryPath:function(filename,torrentUrl){
             return this.server.getMediaDeliveryPath(filename,torrentUrl)
@@ -286,6 +273,7 @@ const app=new Vue({
             },STATUS_INTERVAL_DURATION)
         },
         activateSubtitle:function(index){
+            //activate subtites for local player
             var vidEl=this.$refs.vidEl
 
             if(vidEl){

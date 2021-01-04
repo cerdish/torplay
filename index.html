@@ -69,26 +69,21 @@
 
 					<div>{{currentDeviceStatus}}</div>
 
-					<div v-if="isServerRunning&&currentDeviceName">
-						<div v-if="!currentDevice||!currentDevice.client||!isServerRunning">
-							<button @click="startMediaDelivery(currentMedia,true)">begin playback</button>
-							<button @click="currentDevice._tryJoin(function(e,s){})">join session</button>
+					<div v-if="currentDevice">
+						<div v-if="!currentDevice.client">
+							<button @click="playMedia(currentMedia)">launch media receiver</button>
 						</div>
 		
-						<div v-else-if="currentDevice.client">
-							<div class="flex">
-								<div class="item-flex">
-									<input type="range" min="0" :max="currentMedia.duration" step="1" v-model="currentMedia.currentTime" @change="currentDevice.seekTo($event.target.value)">
-								</div>
-								
-								<div style="width:150px;">
-									{{Math.round(currentMedia.currentTime)}} / {{Math.round(currentMedia.duration)}}
-								</div>
+						<div v-else>
+							<div>
+								<input type="range" min="0" :max="currentMedia.duration" step="1" v-model="currentMedia.currentTime" @change="currentDevice.seekTo($event.target.value)">
 							</div>
 
 							<button @click="currentDevice.resume()">resume</button>
 							<button @click="currentDevice.pause()">pause</button>
-							<button @click="currentDeviceName="">stop</button>
+							<button @click="currentDeviceName=''">stop</button>
+							
+							{{Math.round(currentMedia.currentTime)}} / {{Math.round(currentMedia.duration)}}
 		
 							<label>
 								playback rate:
