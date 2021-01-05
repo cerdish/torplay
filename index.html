@@ -18,7 +18,7 @@
 			<div v-else>
 				<playlist :playlist="playlist"></playlist>
 
-				<section class="device-control" v-if="currentMedia" :key="currentMedia.filename">
+				<section class="device-control" v-if="currentMedia">
 					<div class="flex">
 						<div>
 							<h1>Device Control</h1>
@@ -36,67 +36,73 @@
 							</button>
 						</div>
 					</div>
+					
+					<div v-if="currentDevice" class="flex">
+						<div v-if="currentMedia.poster" class="media-poster" :style="'background:url('+getDeliveryPath(currentMedia.poster)+') 100% / cover no-repeat;'"></div>
 
-					<div class="ellipsis-overflow">{{currentDeviceStatus}} ({{currentMedia ? currentMedia.filename : "no media selected"}})</div>
-
-					<div v-if="currentDevice">
-						<div v-if="!currentDevice.client">
-							<button @click="playMedia(currentMedia)">launch media receiver</button>
-						</div>
-		
-						<div v-else-if="isShowDeviceControls">
-							<div>
-								<input :disabled="isControlsDisabled" type="range" min="0" :max="currentMedia.duration" step="1" v-model="currentMedia.currentTime" @change="currentDevice.seekTo($event.target.value)">
+						<div class="item-flex">
+							<div class="ellipsis-overflow bold pad-b">{{currentMedia ? currentMedia.filename : "no media selected"}}</div>
+							
+							<div v-if="!currentDevice.client">
+								<button @click="playMedia(currentMedia)">launch media receiver</button>
 							</div>
-
-							<div class="flex">
-								<div v-if="currentDeviceStatus=='PAUSED'">
-									<button :disabled="isControlsDisabled" class="a" @click="currentDevice.resume()">
-										<i class="material-icons large">play_circle</i>
-									</button>
-								</div>
-
-								<div v-else>
-									<button :disabled="isControlsDisabled" class="a" @click="currentDevice.pause()">
-										<i class="material-icons large">pause_circle</i>
-									</button>
-								</div>
-
+			
+							<div v-else-if="isShowDeviceControls">
 								<div>
-									<button class="a" @click="closeDeviceConnection(currentDevice)">
-										<i class="material-icons large">cancel</i>
-									</button>
+									<input :disabled="isControlsDisabled" type="range" min="0" :max="currentMedia.duration" step="1" v-model="currentMedia.currentTime" @change="currentDevice.seekTo($event.target.value)">
 								</div>
 
-								<div class="pad ellipsis-overflow">
-									{{seconds2timecode(currentMedia.currentTime)}} / {{seconds2timecode(currentMedia.duration)}}
+								<div class="flex">
+									<div v-if="currentDeviceStatus=='PAUSED'">
+										<button :disabled="isControlsDisabled" class="a" @click="currentDevice.resume()">
+											<i class="material-icons large">play_circle</i>
+										</button>
+									</div>
+
+									<div v-else>
+										<button :disabled="isControlsDisabled" class="a" @click="currentDevice.pause()">
+											<i class="material-icons large">pause_circle</i>
+										</button>
+									</div>
+
+									<div>
+										<button class="a" @click="closeDeviceConnection(currentDevice)">
+											<i class="material-icons large">cancel</i>
+										</button>
+									</div>
+
+									<div class="pad-l ellipsis-overflow item-flex">
+										{{seconds2timecode(currentMedia.currentTime)}} / {{seconds2timecode(currentMedia.duration)}}
+									</div>
+
+									<!---label class="pad">
+										playback rate:
+										<select @change="currentDevice.setPlaybackRate($event.target.value)">
+											<option selected>1</option>
+											<option>1.5</option>
+											<option>2</option>
+											<option>5</option>
+											<option>10</option>
+										</select>
+									</label--->
+
+									<label class="pad-l item-flex nowrap flex" style="max-width:100px;" v-if="currentMedia.subtitles.length">
+										<div>cc:</div>
+										<div class="item-flex">
+											<select style="width:100%;" :disabled="isControlsDisabled" v-model="currentCcIndex">
+												<option value="-1">off</option>
+												<option v-for="cc,ccIndex in currentMedia.subtitles" :value="ccIndex">{{cc.filename}}</option>
+											</select>
+										</div>
+									</label>
 								</div>
-
-								<!---label class="pad">
-									playback rate:
-									<select @change="currentDevice.setPlaybackRate($event.target.value)">
-										<option selected>1</option>
-										<option>1.5</option>
-										<option>2</option>
-										<option>5</option>
-										<option>10</option>
-									</select>
-								</label--->
-
-								<label class="pad" v-if="currentMedia.subtitles.length">
-									cc:
-									<select :disabled="isControlsDisabled" v-model="currentCcIndex">
-										<option value="-1">off</option>
-										<option v-for="cc,ccIndex in currentMedia.subtitles" :value="ccIndex">{{cc.filename}}</option>
-									</select>
-								</label>
 							</div>
 						</div>
 					</div>
 
 					<div v-else>
-						<video ref="vidEl" :src="getMediaDeliveryPath(currentMedia)" controls style="width:100%;" autoplay>
-							<track v-for="subtitle in currentMedia.subtitles" :src="getMediaDeliveryPath(subtitle)" :label="subtitle">
+						<video ref="vidEl" :src="getDeliveryPath(currentMedia)" controls style="width:100%;" autoplay>
+							<track v-for="subtitle in currentMedia.subtitles" :src="getDeliveryPath(subtitle)" :label="subtitle">
 						</video>
 
 						<div>
@@ -144,13 +150,13 @@
 
 								<div class="pad-l">
 									<a class="list-btn" @click.stop="$root.editMedia(mIndex)">
-										<i class="material-icons">edit</i>
+										<i class="material-icons small">edit</i>
 									</a>
 								</div>
 
 								<div style="margin:-0.5em 0;" class="pad-l">
 									<a class="list-btn red" @click.stop="$root.removeMediaFromPlaylist(mIndex)">
-										<i class="material-icons">cancel</i>
+										<i class="material-icons small">cancel</i>
 									</a>
 								</div>
 							</div>
@@ -216,9 +222,15 @@
 
 		<script type="text/x-template" id="editMedia_template">
 			<div class="edit-media">
-				<h1>Edit Media</h1>
+				<div class="flex">
+					<div v-if="media.poster" class="media-poster" :style="'background:url('+$root.getDeliveryPath(media.poster)+') 100% / cover no-repeat;'"></div>
 
-				<div style="word-break:break-all;">{{media.filename}}</div>
+					<div class="item-flex">
+						<h1 style="margin-top:0;margin-bottom:0.25rem;">{{media.filename}}</h1>
+		
+						<div>{{$root.seconds2timecode(media.currentTime)}} / {{$root.seconds2timecode(media.duration)}}</div>
+					</div>
+				</div>
 
 				<h2>Subtitles</h2>
 

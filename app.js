@@ -11,7 +11,6 @@ const url = require('url')
 const { FunctionalRenderContext } = require('vue/dist/vue.min.js')
 
 //supported file formats for chromecast
-const SUPPORTED_MEDIA_FORMATS=["mp4","m4v","webm","mkv"]
 const STATUS_INTERVAL_DURATION=1000
 
 //this is the client we use to detect chromecast devices
@@ -190,7 +189,10 @@ const app=new Vue({
         },
         playMedia:function(media){
             var self=this
-            var mediaDeliveryPath=this.getMediaDeliveryPath(media)
+            var mediaDeliveryPath=this.getDeliveryPath(media)
+
+            //if we are very close to the end of the file we should start the playback over
+            if(media.duration&&media.currentTime>media.duration-5) media.currentTime=0
 
             if(this.currentDevice){
                 var chromecastMedia={
@@ -199,7 +201,7 @@ const app=new Vue({
 
                 if(media.subtitles.length) chromecastMedia.subtitles=_.map(media.subtitles,function(s){
                     return {
-                        url:self.getMediaDeliveryPath(s)
+                        url:self.getDeliveryPath(s)
                     }
                 })
 
@@ -210,8 +212,8 @@ const app=new Vue({
                 })
             }
         },
-        getMediaDeliveryPath:function(file){
-            return this.server.getMediaDeliveryPath(file)
+        getDeliveryPath:function(file){
+            return this.server.getDeliveryPath(file)
         },
         startInterval:function(){
             var self=this
@@ -247,7 +249,7 @@ const app=new Vue({
             }
         },
         seconds2timecode:function(seconds){
-            return seconds2timecode(seconds,1)
+            return seconds2timecode(seconds,2)
         },
         refreshDevices:function(){
             deviceDiscovery.update()
@@ -287,7 +289,7 @@ Vue.component('playlist',{
                 var type=mime.getType(f.path)
                 var ext=mime.getExtension(type)
         
-                if(SUPPORTED_MEDIA_FORMATS.indexOf(ext)>-1) this.$root.addMediaToPlaylist({
+                if(server.SUPPORTED_MEDIA_FORMATS.indexOf(ext)>-1) this.$root.addMediaToPlaylist({
                     filename:f.path.substr(f.path.lastIndexOf("\\")+1),
                     filePath:f.path,
                     subtitles:[],
@@ -320,7 +322,7 @@ Vue.component('addTorrentMedia',{
             return _.filter(this.torrentFiles,function(f){
                 var ext=mime.getExtension(mime.getType(f.name))
 
-                return SUPPORTED_MEDIA_FORMATS.indexOf(ext)>-1
+                return server.SUPPORTED_MEDIA_FORMATS.indexOf(ext)>-1
             })
         }
     },
@@ -344,6 +346,8 @@ Vue.component('addTorrentMedia',{
                 //add allowed file types to the file list to show the user to select from
                 torEng.on('ready',function(){
                     self.torrentFiles=torEng.files
+                    
+                    console.log(_.map(self.torrentFiles,"name"))
 
                     torEng.destroy()
 
@@ -396,7 +400,20 @@ Vue.component('addTorrentMedia',{
                 }
             })
 
-            this.$root.addMediaToPlaylist({torrentUrl:this.torrentUrl,filename:filename,subtitles:subtitles,currentTime:0,duration:0})
+            var poster=_.find(this.torrentFiles,function(f){
+                var ext=mime.getExtension(mime.getType(f.name))
+
+                return f.name.indexOf("poster")>-1 && server.SUPPORTED_IMAGE_FORMATS.indexOf(ext)
+            })
+
+            if(poster) poster={
+                filename:poster.name,
+                torrentUrl:this.torrentUrl
+            }
+
+            console.log(poster)
+
+            this.$root.addMediaToPlaylist({torrentUrl:this.torrentUrl,filename:filename,subtitles:subtitles,currentTime:0,duration:0,poster:poster})
         }
     }
 })
