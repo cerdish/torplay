@@ -16,7 +16,7 @@ function torplayServer(){
     var self=this
 
     self.SUPPORTED_MEDIA_FORMATS=["mp4","m4v","webm","mkv"]
-    self.SUPPORTED_SRT_FORMATS=["srt","vtt"]
+    self.SUPPORTED_CAPTION_FORMATS=["srt","vtt"]
     self.SUPPORTED_IMAGE_FORMATS=["jpg","gif","png","jpeg"]
     self.SUPPORTED_FILE_FORMATS=self.SUPPORTED_IMAGE_FORMATS
 
@@ -117,7 +117,7 @@ torplayServer.prototype.handleTorrentReq = function (req,res,filename,ext,type){
         var stream=torrentFile.createReadStream(range ? range : null)
 
         this.deliverMedia(stream,req,res,filename,ext,type,torrentFile.length,range)
-    }else if(this.SUPPORTED_SRT_FORMATS.indexOf(ext)>-1){
+    }else if(this.SUPPORTED_CAPTION_FORMATS.indexOf(ext)>-1){
         var stream=torrentFile.createReadStream()
 
         this.deliverSubtitles(stream,req,res,filename,ext,type)
@@ -143,7 +143,7 @@ torplayServer.prototype.handleHttpReq = function (httpUrl,req,res,filename,ext,t
 
         if(self.SUPPORTED_MEDIA_FORMATS.indexOf(ext)>-1){
             self.deliverMedia(axiosRes.data,req,res,filename,ext,type,axiosRes.headers["content-length"],false)
-        }else if(self.SUPPORTED_SRT_FORMATS.indexOf(ext)>-1){
+        }else if(self.SUPPORTED_CAPTION_FORMATS.indexOf(ext)>-1){
             self.deliverSubtitles(axiosRes.data,req,res,filename,ext,type)
         }else if(self.SUPPORTED_FILE_FORMATS.indexOf(ext)>-1){
             self.deliverFile(axiosRes.data,req,res,filename,ext,type)
@@ -177,7 +177,7 @@ torplayServer.prototype.handleFileReq = function (filePath,req,res,filename,ext,
         
         if(self.SUPPORTED_MEDIA_FORMATS.indexOf(ext)>-1){
             self.deliverMedia(fileStream,req,res,filename,ext,type,fileSize,range)
-        }else if(self.SUPPORTED_SRT_FORMATS.indexOf(ext)>-1){
+        }else if(self.SUPPORTED_CAPTION_FORMATS.indexOf(ext)>-1){
             self.deliverSubtitles(fileStream,req,res,filename,ext,type)
         }else if(self.SUPPORTED_FILE_FORMATS.indexOf(ext)>-1){
             self.deliverFile(axiosRes.data,req,res,filename,ext,type)

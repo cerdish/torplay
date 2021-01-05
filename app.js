@@ -464,7 +464,7 @@ Vue.component('editMedia',{
                 var type=mime.getType(f.path)
                 var ext=mime.getExtension(type)
         
-                if(ext=="srt"||ext=="vtt") this.media.subtitles.push({
+                if(server.SUPPORTED_CAPTION_FORMATS.indexOf(ext)>-1) this.media.subtitles.push({
                     filename:f.path.substr(f.path.lastIndexOf("\\")+1),
                     filePath:f.path
                 })
