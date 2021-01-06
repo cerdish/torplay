@@ -176,7 +176,7 @@
 
 				<div class="flex">
 					<div class="item-flex has-dropdown">
-						<input :disabled="busy" type="text" v-model="torrentUrl" @focus="isShowHistory=true" @blur="isShowHistory=false">
+						<input :disabled="busy" type="text" v-model="torrentUrl" @focus="isShowHistory=true;console.log('test')" @blur="isShowHistory=false">
 
 						<ul class="torrentUrl-history is-dropdown is-blocks" v-if="isShowHistory">
 							<li v-for="url in torrentUrlHistory">

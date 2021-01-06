@@ -93,7 +93,6 @@ ul.is-blocks > li{
     max-width:100%;
     display:flex;
     align-items:center;
-    overflow:hidden;
 }
 .item-flex{
     flex:1;

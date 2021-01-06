@@ -8,7 +8,6 @@ const torplayServer = require('./torplay-server.js')
 const seconds2timecode = require('seconds2timecode')
 const validUrl = require('valid-url')
 const url = require('url')
-const { FunctionalRenderContext } = require('vue/dist/vue.min.js')
 
 //supported file formats for chromecast
 const STATUS_INTERVAL_DURATION=1000
@@ -378,40 +377,56 @@ Vue.component('addTorrentMedia',{
             this.$root.overlayComponent=false;
         },
         addAllTorrentFiles:function(){
-            for(var i=0;i<this._torrentFiles.length;i++){
-                this.addTorrentFileToPlaylist(this._torrentFiles[i].name)
-            }
+            this.selectedTorrentFiles=_.map(this._torrentFiles,"name")
 
-            this.$root.overlayComponent=false;
+            this.addSelectedTorrentFiles()
         },
         addTorrentFileToPlaylist:function(filename){
-            var noExtName=filename.substr(0,filename.lastIndexOf("."))
+            var filenameNoExt=filename.substr(0,filename.lastIndexOf("."))
             
             var self=this
 
-            var subtitles=_.map(_.filter(this.torrentFiles,function(f){
+            //find any subtitles
+            var subtitles=_.filter(this.torrentFiles,function(f){
                 var ext=mime.getExtension(mime.getType(f.name))
                 
-                return ext=="srt"&&f.name.indexOf(noExtName)>-1
-            }),function(f){
+                return server.SUPPORTED_CAPTION_FORMATS.indexOf(ext)>-1&&f.path.indexOf(filenameNoExt)>-1
+            })
+            
+            //if the first search for subs comes up empty we return any subs we find
+            if(!subtitles.length) var subtitles=_.filter(this.torrentFiles,function(f){
+                var ext=mime.getExtension(mime.getType(f.name))
+                
+                return server.SUPPORTED_CAPTION_FORMATS.indexOf(ext)>-1
+            })
+
+            console.log("subtitles found: ",_.map(subtitles,"name"))
+
+            subtitles=_.map(subtitles,function(f){
                 return {
                     filename:f.name,
                     torrentUrl:self.torrentUrl
                 }
             })
 
+            //find the poster
             var poster=_.find(this.torrentFiles,function(f){
                 var ext=mime.getExtension(mime.getType(f.name))
 
-                return f.name.indexOf("poster")>-1 && server.SUPPORTED_IMAGE_FORMATS.indexOf(ext)
+                return (f.name.indexOf("poster")>-1||f.path.indexOf(filenameNoExt)>-1) && server.SUPPORTED_IMAGE_FORMATS.indexOf(ext)>-1
+            })
+
+            //if nothing named poster we find any images we can
+            if(!poster) poster=_.find(this.torrentFiles,function(f){
+                var ext=mime.getExtension(mime.getType(f.name))
+
+                return server.SUPPORTED_IMAGE_FORMATS.indexOf(ext)>-1
             })
 
             if(poster) poster={
                 filename:poster.name,
                 torrentUrl:this.torrentUrl
-            }
-
-            console.log(poster)
+            },console.log("poster found: ",poster.name)
 
             this.$root.addMediaToPlaylist({torrentUrl:this.torrentUrl,filename:filename,subtitles:subtitles,currentTime:0,duration:0,poster:poster})
         }
