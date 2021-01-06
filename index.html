@@ -15,8 +15,10 @@
 				<div class="pad center">Intiallizing Media Delivery Server...</div>
 			</section>
 
-			<div v-else>
-				<playlist :playlist="playlist"></playlist>
+			<div v-else class="flex col" style="padding:1rem;">
+				<div class="item-flex" style="position:relative;">
+					<playlist :playlist="playlist"></playlist>
+				</div>
 
 				<section class="device-control" v-if="currentMedia">
 					<div class="flex">
@@ -116,57 +118,87 @@
 						</div>
 					</div>
 				</section>
-
-				<section class="overlay is-overlay" v-if="overlayComponent" @click.self="overlayComponent=false">
-					<component :is="overlayComponent" class="overlay-component"></component>
-
-					<button class="a overlay-close" @click="overlayComponent=false">
-						<i class="material-icons small grey">close</i>
-					</button>
-				</section>
 			</div>
+
+			<section class="overlay is-overlay" v-if="overlayComponent" @click.self="overlayComponent=false">
+				<component :is="overlayComponent" class="overlay-component"></component>
+
+				<button class="a overlay-close" @click="overlayComponent=false">
+					<i class="material-icons small grey">close</i>
+				</button>
+			</section>
 		</main>
 
 		<!--- components --->
 		<script type="text/x-template" id="playlist_template">
-			<section class="playlist">
-				<h1>Playlist</h1>
+			<section class="playlist flex col">
+				<h1>Playlists</h1>
 
-				<ul class="playlist is-blocks" ref="playlistUl">
-					<li v-if="!playlist.length">
-						<div class="pad center">
-							No media
-						</div>
-					</li>
+				<div class="flex item-flex" style="align-items:unset;height:100%;">
+					<div class="rel" style="width:25%;min-width:100px;">
+						<div class="flex col">
+							<ul class="playlists is-blocks" ref="playlistsUl" style="height:100%;">
+								<li v-for="playlist,pIndex in playlists.list">
+									<button class="is-block" :class="{active:playlists.selectedPlaylist==pIndex}" @click="playlists.selectPlaylist(pIndex)">
+										<div class="flex">
+											<div class="ellipsis-overflow">
+												{{playlist.name}}
+											</div>
+										</div>
+									</button>
+								</li>
+							</ul>
 
-					<li v-for="media,mIndex in playlist" v-else>
-						<button class="is-block" :class="{active:$root.currentPlaylistIndex==mIndex}" @click="$root.selectMedia(mIndex)">
-							<div class="flex">
-								<div class="item-flex ellipsis-overflow v-center">
-									<span>{{media.filename}}</span>
-
-									<i class="material-icons light-grey small" v-if="media.subtitles.length">closed_caption</i>
-								</div>
-
-								<div class="pad-l">
-									<a class="list-btn" @click.stop="$root.editMedia(mIndex)">
-										<i class="material-icons small">edit</i>
-									</a>
-								</div>
-
-								<div style="margin:-0.5em 0;" class="pad-l">
-									<a class="list-btn red" @click.stop="$root.removeMediaFromPlaylist(mIndex)">
-										<i class="material-icons small">cancel</i>
-									</a>
-								</div>
+							<div class="pad-t right">
+								<button>+</button>
 							</div>
-						</button>
-					</li>
-				</ul>
+						</div>
+					</div>
 
-				<div class="pad-t right">
-					<button @click="$root.overlayComponent='addTorrentMedia'">Add from torrent</button>
+					<div class="pad-l"></div>
+
+					<div class="item-flex rel">
+						<div class="flex col">
+							<ul class="playlist is-blocks item-flex" ref="playlistUl">
+								<li v-if="!playlist.length">
+									<div class="pad center">
+										No media
+									</div>
+								</li>
+			
+								<li v-for="media,mIndex in playlist">
+									<button class="is-block" :class="{active:$root.currentPlaylistIndex==mIndex}" @click="$root.selectMedia(mIndex)">
+										<div class="flex">
+											<div class="item-flex ellipsis-overflow v-center">
+												<span>{{media.filename}}</span>
+			
+												<i class="material-icons light-grey small" v-if="media.subtitles.length">closed_caption</i>
+											</div>
+			
+											<div class="pad-l">
+												<a class="list-btn" @click.stop="$root.editMedia(mIndex)">
+													<i class="material-icons small">edit</i>
+												</a>
+											</div>
+			
+											<div style="margin:-0.5em 0;" class="pad-l">
+												<a class="list-btn red" @click.stop="$root.removeMediaFromPlaylist(mIndex)">
+													<i class="material-icons small">cancel</i>
+												</a>
+											</div>
+										</div>
+									</button>
+								</li>
+							</ul>
+							
+							<div class="pad-t right">
+								<button @click="$root.overlayComponent='addTorrentMedia'">Add from torrent</button>
+							</div>
+						</div>
+					</div>
 				</div>
+
+
 			</section>
 		</script>
 				

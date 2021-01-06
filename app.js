@@ -4,10 +4,11 @@ const readTorrent = require('read-torrent')
 const torrentStream = require('torrent-stream')
 const _ = require('lodash')
 const mime = require('mime')
-const torplayServer = require('./torplay-server.js')
 const seconds2timecode = require('seconds2timecode')
 const validUrl = require('valid-url')
 const url = require('url')
+const torplayServer = require('./tp-server.js')
+const Playlists = require('./tp-playlists.js')
 
 //supported file formats for chromecast
 const STATUS_INTERVAL_DURATION=1000
@@ -17,6 +18,7 @@ const deviceDiscovery = new ChromecastAPI()
 
 //this is the http server instance we use to deliver media
 const server=new torplayServer()
+const playlists=new Playlists()
 
 //init the vue app
 const app=new Vue({
@@ -25,6 +27,7 @@ const app=new Vue({
         server:server,
         devices:[],
         currentDeviceName:localStorage.currentDeviceName || "", //device name is used as a key to find the current device
+        playlists:playlists,
         playlist:JSON.parse(localStorage.playlist||"[]"),
         currentPlaylistIndex:localStorage.currentPlaylistIndex || -1,        
         currentCcIndex:-1,
@@ -273,7 +276,9 @@ const app=new Vue({
 Vue.component('playlist',{
     template:"#playlist_template",
     data:function(){
-        return {}
+        return {
+            playlists:playlists
+        }
     },
     methods:{
 
