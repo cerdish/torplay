@@ -8,7 +8,7 @@ const seconds2timecode = require('seconds2timecode')
 const validUrl = require('valid-url')
 const url = require('url')
 const torplayServer = require('./tp-server.js')
-const Playlists = require('./tp-playlists.js')
+const PlaylistManager = require('./tp-playlist-manager.js')
 
 //supported file formats for chromecast
 const STATUS_INTERVAL_DURATION=1000
@@ -18,7 +18,7 @@ const deviceDiscovery = new ChromecastAPI()
 
 //this is the http server instance we use to deliver media
 const server=new torplayServer()
-const playlists=new Playlists()
+const playlistManager=new PlaylistManager()
 
 //init the vue app
 const app=new Vue({
@@ -27,7 +27,7 @@ const app=new Vue({
         server:server,
         devices:[],
         currentDeviceName:localStorage.currentDeviceName || "", //device name is used as a key to find the current device
-        playlists:playlists,
+        playlistManager:playlistManager,
         statusInterval:false,
         currentDeviceStatus:"DISCONNECTED",
         modal:false,
@@ -51,9 +51,21 @@ const app=new Vue({
             return deviceList
         },
         playingMedia:function(){
-            var pointer=this.playlists.playingMediaPointer
+            var playlists=this.playlistManager.playlists
+            var media=false
 
-            return this.playlists.getMedia(pointer[0],pointer[1])
+            for(p of playlists){
+                for(m of p.media){
+                    if(m.isPlaying){
+                        media=m
+                        break
+                    }
+                }
+
+                if(media) break
+            }
+
+            return media
         },
         isShowDeviceControls:function(){
             var status=this.currentDeviceStatus
@@ -66,9 +78,7 @@ const app=new Vue({
             return ["BUFFERING","IDLE"].indexOf(status) > -1
         },
         selectedPlaylist:function(){
-            var selectedPlaylistIndex=this.playlists.selectedPlaylistIndex
-
-            return this.playlists.getSelectedPlaylist()
+            return _.find(this.playlistManager.playlists,{isSelected:true})
         }
     },
     watch:{
@@ -130,11 +140,17 @@ const app=new Vue({
                     console.log("media ended")
 
                     self.playingMedia.currentTime=0
+                    self.playingMedia.isComplete=true
+
+                    var playlist=self.playingMedia.getPlaylist()
+                    var mediaIndex=_.findIndex(playlist.media,{isPlaying:true})
+
+                    self.playingMedia.isPlaying=false
                     
-                    if(self.selectedPlaylist.selectedMediaIndex<self.playlist.length-1){
+                    if(mediaIndex<playlist.media.length-1){
                         console.log("playing next item in playlist")
     
-                        self.selectMedia(1*self.selectedPlaylist.selectedMediaIndex+1)
+                        self.selectMedia(self.playlistManager.getMedia(mediaIndex+1))
                     }
                 })
             }
@@ -149,19 +165,17 @@ const app=new Vue({
                 self.currentDeviceStatus="DISCONNECTED"
             })
         },
-        selectMedia:function(mediaIndex){
-            this.playlists.selectMedia(mediaIndex)
+        selectMedia:function(media){
+            this.playlistManager.selectMedia(media)
 
-            console.log("selecting media: "+mediaIndex)
+            console.log("selecting media: ",media)
 
-            this.playMedia(mediaIndex,this.playlists.selectedPlaylistIndex)
+            this.playMedia(media)
         },
-        playMedia:function(mediaIndex,playlistIndex){
+        playMedia:function(media){
             var self=this
-            var media=this.playlists.playMedia(this.selectedPlaylist.selectedMediaIndex,this.playlists.selectedPlaylistIndex)
+            var media=this.playlistManager.playMedia(media)
             var mediaDeliveryPath=this.getDeliveryPath(media)
-
-            console.log(this.selectedPlaylist.selectedMediaIndex,this.playlists.selectedPlaylistIndex,media)
             
             //if we are very close to the end of the file we should start the playback over
             if(media.duration&&media.currentTime>media.duration-5) media.currentTime=0
@@ -201,7 +215,7 @@ const app=new Vue({
                             self.playingMedia.currentTime=s.currentTime
                             self.playingMedia.duration=s.media.duration
     
-                            self.playlists.storePlaylists()
+                            self.playlistManager.storePlaylists()
                         }
                     })
                 }
@@ -243,48 +257,20 @@ Vue.component('playlist',{
     template:"#playlist_template",
     data:function(){
         return {
-            playlists:playlists
+            playlistManager:playlistManager
         }
     },
     computed:{
         selectedPlaylist:function(){
-            var selectedPlaylistIndex=this.playlists.selectedPlaylistIndex
-
-            return this.playlists.getSelectedPlaylist()
+            return this.$root.selectedPlaylist
         }
     },
     methods:{
-        editMedia:function(mIndex){
-            this.$root.openModal("editMedia",{
-                mediaIndex:mIndex,
-                playlistIndex:this.playlists.selectedPlaylistIndex
-            })
+        editMedia:function(media){
+            this.$root.openModal("editMedia",{media:media})
         }
     },
-    props:["playlist"],
-    mounted:function(){
-        this.$refs.playlistUl.addEventListener('drop', (e) => {
-            e.preventDefault()
-            e.stopPropagation()
-        
-            for(const f of e.dataTransfer.files){
-                var type=mime.getType(f.path)
-                var ext=mime.getExtension(type)
-        
-                if(server.SUPPORTED_MEDIA_FORMATS.indexOf(ext)>-1) this.$root.addMediaToPlaylist({
-                    filename:f.path.substr(f.path.lastIndexOf("\\")+1),
-                    filePath:f.path,
-                    subtitles:[],
-                    currentTime:0,
-                    duration:0
-                })
-            }
-        })
-        this.$refs.playlistUl.addEventListener('dragover', (e) => {
-            e.preventDefault()
-            e.stopPropagation()
-        })
-    }
+    props:["playlist"]
 })
 
 Vue.component('addTorrentMedia',{
@@ -297,7 +283,7 @@ Vue.component('addTorrentMedia',{
             busy:false,
             torrentUrlHistory:JSON.parse(localStorage.torrentUrlHistory||"[]"),
             isShowHistory:false,
-            playlists:playlists
+            playlistManager:playlistManager
         }
     },
     computed:{
@@ -412,7 +398,7 @@ Vue.component('addTorrentMedia',{
                 torrentUrl:this.torrentUrl
             },console.log("poster found: ",poster.name)
 
-            this.playlists.addMedia({torrentUrl:this.torrentUrl,filename:filename,subtitles:subtitles,poster:poster})
+            this.playlistManager.addMedia({torrentUrl:this.torrentUrl,filename:filename,subtitles:subtitles,poster:poster})
         }
     }
 })
@@ -422,18 +408,10 @@ Vue.component('editMedia',{
     data:function(){
         return {
             newSubtitlesUrl:"",
-            playlists:playlists
+            playlistManager:playlistManager
         }
     },
-    props:["mediaIndex","playlistIndex"],
-    computed:{
-        media:function(){
-            var mediaIndex=this.mediaIndex
-            var playlistIndex=this.playlistIndex
-
-            return playlists.getMedia(this.playlistIndex,this.mediaIndex)
-        }
-    },
+    props:["media"],
     methods:{
         addSubtitles:function(subtitleUrl){
             if(validUrl.isUri(subtitleUrl)){
@@ -477,7 +455,7 @@ Vue.component('add-playlist',{
     template:"#addPlaylist_template",
     data:function(){
         return {
-            playlists:playlists,
+            playlistManager:playlistManager,
             playlistName:""
         }
     }

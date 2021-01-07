@@ -117,15 +117,15 @@
 					<div class="rel" style="width:25%;min-width:100px;">
 						<div class="flex col">
 							<ul class="playlists is-blocks" ref="playlistsUl" style="height:100%;">
-								<li v-for="playlist,pIndex in playlists.list">
-									<button class="is-block" :class="{active:playlists.selectedPlaylistIndex==pIndex}" @click="playlists.selectPlaylist(pIndex)">
+								<li v-for="playlist,pIndex in playlistManager.playlists">
+									<button class="is-block" :class="{active:playlist.isSelected}" @click="playlistManager.selectPlaylist(playlist)">
 										<div class="flex">
 											<div class="ellipsis-overflow item-flex">
 												{{playlist.name}}
 											</div>
 
 											<div class="pad-l">
-												<a class="list-btn red" @click.stop="playlists.removePlaylist(pIndex)">
+												<a class="list-btn red" @click.stop="playlistManager.removePlaylist(pIndex)">
 													<i class="material-icons small">cancel</i>
 												</a>
 											</div>
@@ -142,7 +142,7 @@
 
 					<div class="pad-l"></div>
 
-					<div class="item-flex rel">
+					<div class="item-flex rel" v-if="selectedPlaylist">
 						<div class="flex col">
 							<ul class="playlist is-blocks item-flex" ref="playlistUl">
 								<li v-if="!selectedPlaylist||!selectedPlaylist.media.length">
@@ -152,9 +152,9 @@
 								</li>
 			
 								<li v-for="media,mIndex in selectedPlaylist.media">
-									<button class="is-block" :class="{active:selectedPlaylist.selectedMediaIndex==mIndex}" @click="$root.selectMedia(mIndex)">
+									<button class="is-block" :class="{active:media.isSelected}" @click="$root.selectMedia(media)">
 										<div class="flex">
-											<div class="pad-r" v-if="playlists.playingMediaPointer&&playlists.playingMediaPointer[0]==playlists.selectedPlaylistIndex&&playlists.playingMediaPointer[1]==mIndex">
+											<div class="pad-r" v-if="media.isPlaying">
 												<i class="material-icons small light-grey">play_circle</i>
 											</div>
 
@@ -162,16 +162,17 @@
 												<span>{{media.filename}}</span>
 			
 												<i class="material-icons light-grey small" v-if="media.subtitles.length">closed_caption</i>
+												<i class="material-icons green small" v-if="media.isComplete">done</i>
 											</div>
 			
 											<div class="pad-l">
-												<a class="list-btn" @click.stop="editMedia(mIndex)">
+												<a class="list-btn" @click.stop="editMedia(media)">
 													<i class="material-icons small">edit</i>
 												</a>
 											</div>
 			
 											<div style="margin:-0.5em 0;" class="pad-l">
-												<a class="list-btn red" @click.stop="playlists.removeMedia(mIndex)">
+												<a class="list-btn red" @click.stop="playlistManager.removeMedia(mIndex)">
 													<i class="material-icons small">cancel</i>
 												</a>
 											</div>
@@ -305,7 +306,7 @@
 					</label>
 
 					<div>
-						<button @click="playlists.addPlaylist(playlistName);$root.closeModal()">Add Playlist</button>
+						<button @click="playlistManager.addPlaylist({name:playlistName});$root.closeModal()">Add Playlist</button>
 					</div>
 				</div>
 			</div>
