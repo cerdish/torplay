@@ -6,6 +6,8 @@ function Playlists(playlistData){
     if(this.list.length==0) this.addPlaylist("DEFAULT")
 
     this.selectPlaylist(playlistData.selectedPlaylistIndex||0)
+
+    this.playingMediaPointer=playlistData.playingMediaPointer||[-1,-1]
 }
 
 Playlists.prototype.addPlaylist = function (name){
@@ -18,12 +20,12 @@ Playlists.prototype.addPlaylist = function (name){
     return playlist
 }
 
-Playlists.prototype.getSelectedPlaylist = function (){    
+Playlists.prototype.getSelectedPlaylist = function (){
     return this.getPlaylist(this.selectedPlaylistIndex)
 }
 
 Playlists.prototype.getPlaylist = function (playlistIndex){ 
-    if(this.list.length<=playlistIndex) return false
+    if(this.list.length<=playlistIndex||playlistIndex<0) return false
     
     return this.list[playlistIndex]
 }
@@ -37,7 +39,7 @@ Playlists.prototype.getSelectedMedia = function (){
 Playlists.prototype.getMedia = function (playlistIndex,mediaIndex){
     var playlist=this.getPlaylist(playlistIndex)
 
-    if(!playlist||playlist.media.length<=mediaIndex) return false
+    if(!playlist||playlist.media.length<=mediaIndex||mediaIndex<0) return false
 
     return playlist.media[mediaIndex]
 }
@@ -58,6 +60,21 @@ Playlists.prototype.addMedia = function (media,playlistIndex){
     this.storePlaylists()
 
     return media
+}
+
+Playlists.prototype.removePlaylist = function (playlistIndex){
+    if(typeof(playlistIndex)!="number") playlistIndex=this.selectedPlaylistIndex
+
+    var playlist=this.list[playlistIndex]
+
+    //if we are removing the currently selected media we unselect all media
+    if(this.selectedPlaylist==playlistIndex) this.selectedPlaylist=-1
+    //if the media we removing as above the currently selected media we have to move the selected media index up by 1
+    else if(this.selectedPlaylist>playlistIndex) this.selectedPlaylist--
+
+    this.list.splice(playlistIndex,1)
+
+    this.storePlaylists()
 }
 
 Playlists.prototype.removeMedia = function (mediaIndex,playlistIndex){
@@ -85,6 +102,16 @@ Playlists.prototype.selectMedia = function (mediaIndex){
     this.list[this.selectedPlaylistIndex].selectedMediaIndex=mediaIndex
 
     this.storePlaylists()
+}
+
+Playlists.prototype.playMedia = function (mediaIndex,playlistIndex){
+    if(typeof(playlistIndex)!="number") playlistIndex=this.selectedPlaylistIndex
+
+    this.playingMediaPointer=[playlistIndex,mediaIndex]
+
+    this.storePlaylists()
+
+    return this.getMedia(mediaIndex,playlistIndex)
 }
 
 Playlists.prototype.storePlaylists = function (){

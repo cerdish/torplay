@@ -20,7 +20,7 @@
 					<playlist></playlist>
 				</div>
 
-				<section class="device-control" v-if="selectedMedia">
+				<section class="device-control" v-if="playingMedia">
 					<div class="flex">
 						<div>
 							<h1>Device Control</h1>
@@ -40,18 +40,18 @@
 					</div>
 					
 					<div v-if="currentDevice" class="flex">
-						<div v-if="selectedMedia.poster" class="media-poster" :style="'background:url('+getDeliveryPath(selectedMedia.poster)+') 100% / cover no-repeat;'"></div>
+						<div v-if="playingMedia.poster" class="media-poster" :style="'background:url('+getDeliveryPath(playingMedia.poster)+') 100% / cover no-repeat;'"></div>
 
 						<div class="item-flex">
-							<div class="ellipsis-overflow bold pad-b">{{selectedMedia ? selectedMedia.filename : "no media selected"}}</div>
+							<div class="ellipsis-overflow bold pad-b">{{playingMedia ? playingMedia.filename : "no media selected"}}</div>
 							
 							<div v-if="!currentDevice.client">
-								<button @click="playMedia(selectedMedia)">launch media receiver</button>
+								<button @click="playMedia(playingMedia)">launch media receiver</button>
 							</div>
 			
 							<div v-else-if="isShowDeviceControls">
 								<div>
-									<input :disabled="isControlsDisabled" type="range" min="0" :max="selectedMedia.duration" step="1" v-model="selectedMedia.currentTime" @change="currentDevice.seekTo($event.target.value)">
+									<input :disabled="isControlsDisabled" type="range" min="0" :max="playingMedia.duration" step="1" v-model="playingMedia.currentTime" @change="currentDevice.seekTo($event.target.value)">
 								</div>
 
 								<div class="flex">
@@ -74,15 +74,15 @@
 									</div>
 
 									<div class="pad-l ellipsis-overflow item-flex">
-										{{seconds2timecode(selectedMedia.currentTime)}} / {{seconds2timecode(selectedMedia.duration)}}
+										{{seconds2timecode(playingMedia.currentTime)}} / {{seconds2timecode(playingMedia.duration)}}
 									</div>
 
-									<label class="pad-l item-flex nowrap flex" style="max-width:100px;" v-if="selectedMedia.subtitles.length">
+									<label class="pad-l item-flex nowrap flex" style="max-width:100px;" v-if="playingMedia.subtitles.length">
 										<div>cc:</div>
 										<div class="item-flex">
 											<select style="width:100%;" :disabled="isControlsDisabled" v-model="currentCcIndex">
 												<option value="-1">off</option>
-												<option v-for="cc,ccIndex in selectedMedia.subtitles" :value="ccIndex">{{cc.filename}}</option>
+												<option v-for="cc,ccIndex in playingMedia.subtitles" :value="ccIndex">{{cc.filename}}</option>
 											</select>
 										</div>
 									</label>
@@ -92,16 +92,16 @@
 					</div>
 
 					<div v-else>
-						<video ref="vidEl" :src="getDeliveryPath(selectedMedia)" controls style="width:100%;" autoplay>
-							<track v-for="subtitle in selectedMedia.subtitles" :src="getDeliveryPath(subtitle)" :label="subtitle">
+						<video ref="vidEl" :src="getDeliveryPath(playingMedia)" controls style="width:100%;" autoplay>
+							<track v-for="subtitle in playingMedia.subtitles" :src="getDeliveryPath(subtitle)" :label="subtitle">
 						</video>
 
 						<div>
-							<label v-if="selectedMedia.subtitles.length">
+							<label v-if="playingMedia.subtitles.length">
 								cc:
 								<select @change="activateSubtitle($event.target.value)">
 									<option value="-1">off</option>
-									<option v-for="cc,ccIndex in selectedMedia.subtitles" :value="ccIndex">{{cc.filename}}</option>
+									<option v-for="cc,ccIndex in playingMedia.subtitles" :value="ccIndex">{{cc.filename}}</option>
 								</select>
 							</label>
 						</div>
@@ -130,8 +130,14 @@
 								<li v-for="playlist,pIndex in playlists.list">
 									<button class="is-block" :class="{active:playlists.selectedPlaylistIndex==pIndex}" @click="playlists.selectPlaylist(pIndex)">
 										<div class="flex">
-											<div class="ellipsis-overflow">
+											<div class="ellipsis-overflow item-flex">
 												{{playlist.name}}
+											</div>
+
+											<div class="pad-l">
+												<a class="list-btn red" @click.stop="playlists.removePlaylist(pIndex)">
+													<i class="material-icons small">cancel</i>
+												</a>
 											</div>
 										</div>
 									</button>
@@ -139,7 +145,7 @@
 							</ul>
 
 							<div class="pad-t right">
-								<button>+</button>
+								<button @click="$root.openModal('addPlaylist')">+</button>
 							</div>
 						</div>
 					</div>
@@ -149,7 +155,7 @@
 					<div class="item-flex rel">
 						<div class="flex col">
 							<ul class="playlist is-blocks item-flex" ref="playlistUl">
-								<li v-if="!selectedPlaylist.media.length">
+								<li v-if="!selectedPlaylist||!selectedPlaylist.media.length">
 									<div class="pad center">
 										No media
 									</div>
@@ -158,6 +164,10 @@
 								<li v-for="media,mIndex in selectedPlaylist.media">
 									<button class="is-block" :class="{active:selectedPlaylist.selectedMediaIndex==mIndex}" @click="$root.selectMedia(mIndex)">
 										<div class="flex">
+											<!---div v-if="playlists.selectedPlaylistIndex==pIndex&&selectedPlaylist.selectedMediaIndex==mIndex">
+												<i class="material-icons small light-grey">play_circle</i>
+											</div--->
+
 											<div class="item-flex ellipsis-overflow v-center">
 												<span>{{media.filename}}</span>
 			
@@ -284,6 +294,28 @@
 
 					<div>
 						<button @click="addSubtitles(newSubtitlesUrl)">Add Subtitles</button>
+					</div>
+				</div>
+			</div>
+		</script>
+
+		<script type="text/x-template" id="addPlaylist_template">
+			<div class="add-playlist">
+				<h1>Add Playlist</h1>
+
+				<div class="pad-t flex">
+					<label class="item-flex flex">
+						<span>Name:</span>
+						
+						<div class="pad-l"></div>
+
+						<div class="item-flex">
+							<input type="text" v-model="playlistName">
+						</div>
+					</label>
+
+					<div>
+						<button @click="playlists.addPlaylist(playlistName);$root.closeModal()">Add Playlist</button>
 					</div>
 				</div>
 			</div>

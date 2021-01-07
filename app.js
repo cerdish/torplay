@@ -50,14 +50,10 @@ const app=new Vue({
 
             return deviceList
         },
-        selectedMedia:function(){
-            var selectedPlaylist=this.selectedPlaylist
+        playingMedia:function(){
+            var pointer=this.playlists.playingMediaPointer
 
-            if(!selectedPlaylist) return false
-
-            var selectedMediaIndex=selectedPlaylist.selectedMediaIndex
-
-            return this.playlists.getSelectedMedia()
+            return this.playlists.getMedia(pointer[1],pointer[0])
         },
         isShowDeviceControls:function(){
             var status=this.currentDeviceStatus
@@ -132,7 +128,7 @@ const app=new Vue({
                 device.on("finished",function(){
                     console.log("media ended")
 
-                    self.selectedMedia.currentTime=0
+                    self.playingMedia.currentTime=0
                     
                     if(self.selectedPlaylist.selectedMediaIndex<self.playlist.length-1){
                         console.log("playing next item in playlist")
@@ -157,13 +153,14 @@ const app=new Vue({
 
             console.log("selecting media: "+mediaIndex)
 
-            this.playMedia(this.playlists.getSelectedMedia())
+            this.playMedia(mediaIndex,this.playlists.selectedPlaylistIndex)
         },
-        playMedia:function(media){
+        playMedia:function(mediaIndex,playlistIndex){
             var self=this
-            console.log(media)
+            var media=this.playlists.playMedia(this.selectedPlaylist.selectedMediaIndex,this.playlists.selectedPlaylistIndex)
             var mediaDeliveryPath=this.getDeliveryPath(media)
 
+            
             //if we are very close to the end of the file we should start the playback over
             if(media.duration&&media.currentTime>media.duration-5) media.currentTime=0
 
@@ -198,9 +195,9 @@ const app=new Vue({
                     self.currentDevice.player.getStatus(function(e,s){
                         if(e) console.log(e)
     
-                        if(s&&self.selectedMedia&&s.media){
-                            self.selectedMedia.currentTime=s.currentTime
-                            self.selectedMedia.duration=s.media.duration
+                        if(s&&self.playingMedia&&s.media){
+                            self.playingMedia.currentTime=s.currentTime
+                            self.playingMedia.duration=s.media.duration
     
                             self.playlists.storePlaylists()
                         }
@@ -482,5 +479,15 @@ Vue.component('editMedia',{
             e.preventDefault()
             e.stopPropagation()
         })
+    }
+})
+
+Vue.component('addPlaylist',{
+    template:"#addPlaylist_template",
+    data:function(){
+        return {
+            playlists:playlists,
+            playlistName:""
+        }
     }
 })
