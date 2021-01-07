@@ -53,7 +53,7 @@ const app=new Vue({
         playingMedia:function(){
             var pointer=this.playlists.playingMediaPointer
 
-            return this.playlists.getMedia(pointer[1],pointer[0])
+            return this.playlists.getMedia(pointer[0],pointer[1])
         },
         isShowDeviceControls:function(){
             var status=this.currentDeviceStatus
@@ -117,11 +117,12 @@ const app=new Vue({
             if(device&&!device._events.status){
                 console.log("adding listeners: ",device)
 
-                device.on("connected",function(s){
+                device.on("connected",function(){
                     self.currentDeviceStatus="CONNECTED"
                 })
                 
                 device.on("status",function(s){
+                    console.log(s)
                     self.currentDeviceStatus=s.playerState
                 })
     
@@ -160,6 +161,7 @@ const app=new Vue({
             var media=this.playlists.playMedia(this.selectedPlaylist.selectedMediaIndex,this.playlists.selectedPlaylistIndex)
             var mediaDeliveryPath=this.getDeliveryPath(media)
 
+            console.log(this.selectedPlaylist.selectedMediaIndex,this.playlists.selectedPlaylistIndex,media)
             
             //if we are very close to the end of the file we should start the playback over
             if(media.duration&&media.currentTime>media.duration-5) media.currentTime=0
@@ -204,17 +206,6 @@ const app=new Vue({
                     })
                 }
             },STATUS_INTERVAL_DURATION)
-        },
-        activateSubtitle:function(index){
-            //activate subtites for local player
-            var vidEl=this.$refs.vidEl
-
-            if(vidEl){
-                for(var i=0;i<vidEl.textTracks.length;i++){
-                    if(i==index) vidEl.textTracks[i].mode="showing"
-                    else vidEl.textTracks[i].mode="hidden"
-                }
-            }
         },
         seconds2timecode:function(seconds){
             return seconds2timecode(seconds,2)
@@ -352,7 +343,7 @@ Vue.component('addTorrentMedia',{
         addTorrentUrlToHistory:function(url){
             if(this.torrentUrlHistory.indexOf(url)==-1) this.torrentUrlHistory.unshift(url)
 
-            this.torrentUrlHistory=this.torrentUrlHistory.slice(0,10)
+            this.torrentUrlHistory=this.torrentUrlHistory.slice(0,20)
 
             localStorage.torrentUrlHistory=JSON.stringify(this.torrentUrlHistory)
         },
@@ -370,12 +361,12 @@ Vue.component('addTorrentMedia',{
             this.$root.closeModal()
         },
         addAllTorrentFiles:function(){
-            this.selectedTorrentFiles=_.map(this._torrentFiles,"name")
+            this.selectedTorrentFiles=_.map(this._torrentFiles,"path")
 
             this.addSelectedTorrentFiles()
         },
         addTorrentFileToPlaylist:function(filename){
-            var filenameNoExt=filename.substr(0,filename.lastIndexOf("."))
+            var filenameNoExt=filename.substr(0,filename.lastIndexOf(".")).substring(filename.lastIndexOf("\\"))
             
             var self=this
 
@@ -393,11 +384,11 @@ Vue.component('addTorrentMedia',{
                 return server.SUPPORTED_CAPTION_FORMATS.indexOf(ext)>-1
             })
 
-            console.log("subtitles found: ",_.map(subtitles,"name"))
+            console.log("subtitles found: ",_.map(subtitles,"path"))
 
             subtitles=_.map(subtitles,function(f){
                 return {
-                    filename:f.name,
+                    filename:f.path,
                     torrentUrl:self.torrentUrl
                 }
             })
@@ -417,7 +408,7 @@ Vue.component('addTorrentMedia',{
             })
 
             if(poster) poster={
-                filename:poster.name,
+                filename:poster.path,
                 torrentUrl:this.torrentUrl
             },console.log("poster found: ",poster.name)
 
@@ -440,7 +431,7 @@ Vue.component('editMedia',{
             var mediaIndex=this.mediaIndex
             var playlistIndex=this.playlistIndex
 
-            return playlists.getMedia(this.mediaIndex,this.playlistIndex)
+            return playlists.getMedia(this.playlistIndex,this.mediaIndex)
         }
     },
     methods:{
@@ -482,12 +473,34 @@ Vue.component('editMedia',{
     }
 })
 
-Vue.component('addPlaylist',{
+Vue.component('add-playlist',{
     template:"#addPlaylist_template",
     data:function(){
         return {
             playlists:playlists,
             playlistName:""
+        }
+    }
+})
+
+Vue.component('local-video',{
+    template:"#localVideo_template",
+    data:function(){
+        return {
+        }
+    },
+    props:["media"],
+    methods:{
+        activateSubtitle:function(index){
+            //activate subtites for local player
+            var vidEl=this.$refs.vidEl
+
+            if(vidEl){
+                for(var i=0;i<vidEl.textTracks.length;i++){
+                    if(i==index) vidEl.textTracks[i].mode="showing"
+                    else vidEl.textTracks[i].mode="hidden"
+                }
+            }
         }
     }
 })

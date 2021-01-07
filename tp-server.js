@@ -28,7 +28,7 @@ function torplayServer(){
         const urlInfo = url.parse(req.url,true)
         const pathname = urlInfo.pathname
 
-        const filename=decodeURI(pathname.substr(pathname.lastIndexOf("/")+1,req.url.length))
+        const filename=decodeURI(pathname)
         const type=mime.getType(filename)
         const ext=mime.getExtension(type)
         
@@ -101,11 +101,14 @@ torplayServer.prototype.listen = function (port,callback) {
 }
 
 torplayServer.prototype.handleTorrentReq = function (req,res,filename,ext,type){
-    var torrentFile=_.find(this.torrentEngine.files,{name:filename})
+    var torrentFile=_.find(this.torrentEngine.files,function(f){
+        var fpath=url.parse(f.path).pathname
+        
+        return "/"+fpath==filename
+    })
 
     //if we don't find the file then we return not found and return
     if(!torrentFile){
-        console.log("nofound 0")
         this.handleNotFoundReq(req,res,filename)
         return false
     }
@@ -126,7 +129,6 @@ torplayServer.prototype.handleTorrentReq = function (req,res,filename,ext,type){
 
         this.deliverFile(stream,req,res,filename,ext,type)
     }else{
-        console.log("test: "+ this.SUPPORTED_FILE_FORMATS.indexOf(ext)>-1,ext)
         this.handleNotFoundReq(req,res,filename)
     }
 }
@@ -139,8 +141,6 @@ torplayServer.prototype.handleHttpReq = function (httpUrl,req,res,filename,ext,t
         url:httpUrl,
         responseType:'stream'
     }).then(function(axiosRes){
-        console.log(axiosRes)
-
         if(self.SUPPORTED_MEDIA_FORMATS.indexOf(ext)>-1){
             self.deliverMedia(axiosRes.data,req,res,filename,ext,type,axiosRes.headers["content-length"],false)
         }else if(self.SUPPORTED_CAPTION_FORMATS.indexOf(ext)>-1){
@@ -164,17 +164,13 @@ torplayServer.prototype.handleFileReq = function (filePath,req,res,filename,ext,
 
     var range=req.headers.range ? parseRange(fileSize,req.headers.range)[0] : false
 
-    console.log(range,fileSize)
-
     var fileStream=fs.createReadStream(filePath,range ? range : null)
 
     fileStream.on("error",function(e){
         console.log(e)
     })
 
-    fileStream.on('open',function(){
-        console.log("stream openned")
-        
+    fileStream.on('open',function(){        
         if(self.SUPPORTED_MEDIA_FORMATS.indexOf(ext)>-1){
             self.deliverMedia(fileStream,req,res,filename,ext,type,fileSize,range)
         }else if(self.SUPPORTED_CAPTION_FORMATS.indexOf(ext)>-1){
@@ -248,7 +244,7 @@ torplayServer.prototype.close = function (callback) {
 }
 
 torplayServer.prototype.getDeliveryPath = function (file){
-    var mediaDeliveryPath="http://" + address() + ":8080/" + file.filename
+    var mediaDeliveryPath="http://" + address() + ":8080/" + url.parse(file.filename).pathname
     
     var type=mime.getType(file.filename)
     var ext=mime.getExtension(type)

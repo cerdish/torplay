@@ -146,11 +146,6 @@ ul.is-blocks > li{
     background:#fff;
     padding:1rem;
 }
-.modal-close{
-    position:absolute;
-    top:2.5rem;
-    right:2.5rem;
-}
 
 .red{
     color:#e00;

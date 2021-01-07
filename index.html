@@ -80,7 +80,7 @@
 									<label class="pad-l item-flex nowrap flex" style="max-width:100px;" v-if="playingMedia.subtitles.length">
 										<div>cc:</div>
 										<div class="item-flex">
-											<select style="width:100%;" :disabled="isControlsDisabled" v-model="currentCcIndex">
+											<select style="width:100%;" :disabled="isControlsDisabled" v-model="playingMedia.selectedCaptionsIndex" @change="currentDevice.changeSubtitles(playingMedia.selectedCaptionsIndex);console.log(playingMedia.selectedCaptionsIndex)">
 												<option value="-1">off</option>
 												<option v-for="cc,ccIndex in playingMedia.subtitles" :value="ccIndex">{{cc.filename}}</option>
 											</select>
@@ -92,29 +92,19 @@
 					</div>
 
 					<div v-else>
-						<video ref="vidEl" :src="getDeliveryPath(playingMedia)" controls style="width:100%;" autoplay>
-							<track v-for="subtitle in playingMedia.subtitles" :src="getDeliveryPath(subtitle)" :label="subtitle">
-						</video>
-
-						<div>
-							<label v-if="playingMedia.subtitles.length">
-								cc:
-								<select @change="activateSubtitle($event.target.value)">
-									<option value="-1">off</option>
-									<option v-for="cc,ccIndex in playingMedia.subtitles" :value="ccIndex">{{cc.filename}}</option>
-								</select>
-							</label>
-						</div>
+						<button @click="openModal('local-video',{media:playingMedia})">Launch Video Player</button>
 					</div>
 				</section>
 			</div>
 
 			<section class="modal is-modal" v-if="modal" @click.self="closeModal()">
+				<div class="right" style="background:#eee;">
+					<button class="a modal-close" @click="closeModal()">
+						<i class="material-icons small grey">close</i>
+					</button>
+				</div>
 				<component :is="modal.component" v-bind="modal.data" class="modal-component"></component>
 
-				<button class="a modal-close" @click="closeModal()">
-					<i class="material-icons small grey">close</i>
-				</button>
 			</section>
 		</main>
 
@@ -145,7 +135,7 @@
 							</ul>
 
 							<div class="pad-t right">
-								<button @click="$root.openModal('addPlaylist')">+</button>
+								<button @click="$root.openModal('add-playlist')">+</button>
 							</div>
 						</div>
 					</div>
@@ -164,9 +154,9 @@
 								<li v-for="media,mIndex in selectedPlaylist.media">
 									<button class="is-block" :class="{active:selectedPlaylist.selectedMediaIndex==mIndex}" @click="$root.selectMedia(mIndex)">
 										<div class="flex">
-											<!---div v-if="playlists.selectedPlaylistIndex==pIndex&&selectedPlaylist.selectedMediaIndex==mIndex">
+											<div class="pad-r" v-if="playlists.playingMediaPointer&&playlists.playingMediaPointer[0]==playlists.selectedPlaylistIndex&&playlists.playingMediaPointer[1]==mIndex">
 												<i class="material-icons small light-grey">play_circle</i>
-											</div--->
+											</div>
 
 											<div class="item-flex ellipsis-overflow v-center">
 												<span>{{media.filename}}</span>
@@ -230,7 +220,7 @@
 						</li>
 	
 						<li v-for="file in _torrentFiles" v-else>
-							<button class="is-block" @click="selectTorrentFile(file.name)" :class="{active:selectedTorrentFiles.indexOf(file.name)>-1}">
+							<button class="is-block" @click="selectTorrentFile(file.path)" :class="{active:selectedTorrentFiles.indexOf(file.path)>-1}">
 								<div class="flex">
 									<div class="item-flex">
 										{{file.name}}
@@ -317,6 +307,24 @@
 					<div>
 						<button @click="playlists.addPlaylist(playlistName);$root.closeModal()">Add Playlist</button>
 					</div>
+				</div>
+			</div>
+		</script>
+
+		<script type="text/x-template" id="localVideo_template">
+			<div class="local-video">
+				<video ref="vidEl" :src="$root.getDeliveryPath(media)" controls style="width:100%;" autoplay>
+					<track v-for="subtitle in media.subtitles" :src="$root.getDeliveryPath(subtitle)" :label="subtitle">
+				</video>
+
+				<div>
+					<label v-if="media.subtitles.length">
+						cc:
+						<select @change="activateSubtitle($event.target.value)">
+							<option value="-1">off</option>
+							<option v-for="cc,ccIndex in media.subtitles" :value="ccIndex">{{cc.filename}}</option>
+						</select>
+					</label>
 				</div>
 			</div>
 		</script>

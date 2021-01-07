@@ -38,7 +38,7 @@ Playlists.prototype.getSelectedMedia = function (){
 
 Playlists.prototype.getMedia = function (playlistIndex,mediaIndex){
     var playlist=this.getPlaylist(playlistIndex)
-
+    
     if(!playlist||playlist.media.length<=mediaIndex||mediaIndex<0) return false
 
     return playlist.media[mediaIndex]
@@ -49,13 +49,13 @@ Playlists.prototype.addMedia = function (media,playlistIndex){
 
     if(typeof(media.currentTime)!="number") media.currentTime=0
     if(typeof(media.duration)!="number") media.duration=0
-    if(typeof(media.selectedCaptions)!="number") media.selectedCaptions=-1
+    if(typeof(media.selectedCaptionsIndex)!="number") media.selectedCaptionsIndex=-1
     if(typeof(media.isComplete)!="boolean") media.isComplete=false
-    if(typeof(media.subtitles)!="array") media.subtitles=[]
+    if(typeof(media.subtitles)!="object") media.subtitles=[]
     
     this.list[playlistIndex].media.push(media)
 
-    console.log("adding media: ",this.list)
+    console.log("adding media: ",media)
 
     this.storePlaylists()
 
@@ -111,7 +111,7 @@ Playlists.prototype.playMedia = function (mediaIndex,playlistIndex){
 
     this.storePlaylists()
 
-    return this.getMedia(mediaIndex,playlistIndex)
+    return this.getMedia(playlistIndex,mediaIndex)
 }
 
 Playlists.prototype.storePlaylists = function (){
