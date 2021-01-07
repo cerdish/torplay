@@ -28,11 +28,7 @@ const app=new Vue({
         devices:[],
         currentDeviceName:localStorage.currentDeviceName || "", //device name is used as a key to find the current device
         playlists:playlists,
-        playlist:JSON.parse(localStorage.playlist||"[]"),
-        currentPlaylistIndex:localStorage.currentPlaylistIndex || -1,        
-        currentCcIndex:-1,
         statusInterval:false,
-        playbackRate:1,
         currentDeviceStatus:"DISCONNECTED",
         overlayComponent:false,
         mediaEditorIndex:-1
@@ -54,10 +50,14 @@ const app=new Vue({
 
             return deviceList
         },
-        currentMedia:function(){
-            if(this.currentPlaylistIndex>-1&&this.currentPlaylistIndex<this.playlist.length) return this.playlist[this.currentPlaylistIndex]
+        selectedMedia:function(){
+            var selectedPlaylist=this.selectedPlaylist
 
-            return false
+            if(!selectedPlaylist) return false
+
+            var selectedMediaIndex=selectedPlaylist.selectedMediaIndex
+
+            return this.playlists.getSelectedMedia()
         },
         isShowDeviceControls:function(){
             var status=this.currentDeviceStatus
@@ -68,27 +68,17 @@ const app=new Vue({
             var status=this.currentDeviceStatus
 
             return ["BUFFERING","IDLE"].indexOf(status) > -1
+        },
+        selectedPlaylist:function(){
+            var selectedPlaylistIndex=this.playlists.selectedPlaylistIndex
+
+            return this.playlists.getSelectedPlaylist()
         }
     },
     watch:{
         torrentUrl:function(){
             //if this changes we rese the file list so that we dont add the wrong torrent url when adding media to the playlist
             this.torrentFiles=[]
-        },
-        playlist:function(){
-            //when the playlist changes we store those changes in local storage
-            this.storePlaylist()
-        },
-        currentPlaylistIndex:function(){
-            //when the index changes we save that to local storage for when the user returns to the app later
-            localStorage.currentPlaylistIndex=this.currentPlaylistIndex
-        },
-        currentCcIndex:function(){
-            //if we change currnet cc index and there is a device set we change the cc index for that device
-            if(this.currentDevice){
-                if(this.currentCcIndex==-1) this.currentDevice.subtitlesOff()
-                else this.currentDevice.changeSubtitles(this.currentCcIndex)
-            }
         },
         currentDevice:function(newDevice,oldDevice){
             var self=this
@@ -142,12 +132,12 @@ const app=new Vue({
                 device.on("finished",function(){
                     console.log("media ended")
 
-                    self.currentMedia.currentTime=0
+                    self.selectedMedia.currentTime=0
                     
-                    if(self.currentPlaylistIndex<self.playlist.length-1){
+                    if(self.selectedPlaylist.selectedMediaIndex<self.playlist.length-1){
                         console.log("playing next item in playlist")
     
-                        self.selectMedia(1*self.currentPlaylistIndex+1)
+                        self.selectMedia(1*self.selectedPlaylist.selectedMediaIndex+1)
                     }
                 })
             }
@@ -162,35 +152,20 @@ const app=new Vue({
                 self.currentDeviceStatus="DISCONNECTED"
             })
         },
-        addMediaToPlaylist:function(media){
-            this.playlist.push(media)
-        },
-        removeMediaFromPlaylist:function(mIndex){
-            //if we are removing the currently selected media we unselect all media
-            if(this.currentPlaylistIndex==mIndex) this.currentPlaylistIndex=-1
-            //if the media we removing as above the currently selected media we have to move the selected media index up by 1
-            else if(this.currentPlaylistIndex>mIndex) this.currentPlaylistIndex--
-
-            this.playlist.splice(mIndex,1)
-        },
-        storePlaylist:function(){
-            localStorage.playlist=JSON.stringify(this.playlist)
-        },
         editMedia:function(mIndex){
             this.mediaEditorIndex=mIndex
             this.overlayComponent="editMedia"
         },
         selectMedia:function(mediaIndex){
-            this.currentPlaylistIndex=mediaIndex
-            this.currentCCIndex=-1
-            this.playbackRate=1
+            this.playlists.selectMedia(mediaIndex)
 
             console.log("selecting media: "+mediaIndex)
 
-            this.playMedia(this.playlist[this.currentPlaylistIndex])
+            this.playMedia(this.playlists.getSelectedMedia())
         },
         playMedia:function(media){
             var self=this
+            console.log(media)
             var mediaDeliveryPath=this.getDeliveryPath(media)
 
             //if we are very close to the end of the file we should start the playback over
@@ -226,14 +201,12 @@ const app=new Vue({
                 if(self.currentDevice&&self.currentDevice.player&&self.currentDevice.player.client){
                     self.currentDevice.player.getStatus(function(e,s){
                         if(e) console.log(e)
-
-                        var currentMedia=self.playlist[self.currentPlaylistIndex]
     
-                        if(s&&self.currentMedia&&s.media){
-                            currentMedia.currentTime=s.currentTime
-                            currentMedia.duration=s.media.duration
+                        if(s&&self.selectedMedia&&s.media){
+                            self.selectedMedia.currentTime=s.currentTime
+                            self.selectedMedia.duration=s.media.duration
     
-                            self.storePlaylist()
+                            self.playlists.storePlaylists()
                         }
                     })
                 }
@@ -280,6 +253,13 @@ Vue.component('playlist',{
             playlists:playlists
         }
     },
+    computed:{
+        selectedPlaylist:function(){
+            var selectedPlaylistIndex=this.playlists.selectedPlaylistIndex
+
+            return this.playlists.getSelectedPlaylist()
+        }
+    },
     methods:{
 
     },
@@ -318,7 +298,8 @@ Vue.component('addTorrentMedia',{
             selectedTorrentFiles:[],
             busy:false,
             torrentUrlHistory:JSON.parse(localStorage.torrentUrlHistory||"[]"),
-            isShowHistory:false
+            isShowHistory:false,
+            playlists:playlists
         }
     },
     computed:{
@@ -433,7 +414,7 @@ Vue.component('addTorrentMedia',{
                 torrentUrl:this.torrentUrl
             },console.log("poster found: ",poster.name)
 
-            this.$root.addMediaToPlaylist({torrentUrl:this.torrentUrl,filename:filename,subtitles:subtitles,currentTime:0,duration:0,poster:poster})
+            this.playlists.addMedia({torrentUrl:this.torrentUrl,filename:filename,subtitles:subtitles,poster:poster})
         }
     }
 })

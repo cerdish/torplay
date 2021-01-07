@@ -17,10 +17,10 @@
 
 			<div v-else class="flex col" style="padding:1rem;">
 				<div class="item-flex" style="position:relative;">
-					<playlist :playlist="playlist"></playlist>
+					<playlist></playlist>
 				</div>
 
-				<section class="device-control" v-if="currentMedia">
+				<section class="device-control" v-if="selectedMedia">
 					<div class="flex">
 						<div>
 							<h1>Device Control</h1>
@@ -40,18 +40,18 @@
 					</div>
 					
 					<div v-if="currentDevice" class="flex">
-						<div v-if="currentMedia.poster" class="media-poster" :style="'background:url('+getDeliveryPath(currentMedia.poster)+') 100% / cover no-repeat;'"></div>
+						<div v-if="selectedMedia.poster" class="media-poster" :style="'background:url('+getDeliveryPath(selectedMedia.poster)+') 100% / cover no-repeat;'"></div>
 
 						<div class="item-flex">
-							<div class="ellipsis-overflow bold pad-b">{{currentMedia ? currentMedia.filename : "no media selected"}}</div>
+							<div class="ellipsis-overflow bold pad-b">{{selectedMedia ? selectedMedia.filename : "no media selected"}}</div>
 							
 							<div v-if="!currentDevice.client">
-								<button @click="playMedia(currentMedia)">launch media receiver</button>
+								<button @click="playMedia(selectedMedia)">launch media receiver</button>
 							</div>
 			
 							<div v-else-if="isShowDeviceControls">
 								<div>
-									<input :disabled="isControlsDisabled" type="range" min="0" :max="currentMedia.duration" step="1" v-model="currentMedia.currentTime" @change="currentDevice.seekTo($event.target.value)">
+									<input :disabled="isControlsDisabled" type="range" min="0" :max="selectedMedia.duration" step="1" v-model="selectedMedia.currentTime" @change="currentDevice.seekTo($event.target.value)">
 								</div>
 
 								<div class="flex">
@@ -74,26 +74,15 @@
 									</div>
 
 									<div class="pad-l ellipsis-overflow item-flex">
-										{{seconds2timecode(currentMedia.currentTime)}} / {{seconds2timecode(currentMedia.duration)}}
+										{{seconds2timecode(selectedMedia.currentTime)}} / {{seconds2timecode(selectedMedia.duration)}}
 									</div>
 
-									<!---label class="pad">
-										playback rate:
-										<select @change="currentDevice.setPlaybackRate($event.target.value)">
-											<option selected>1</option>
-											<option>1.5</option>
-											<option>2</option>
-											<option>5</option>
-											<option>10</option>
-										</select>
-									</label--->
-
-									<label class="pad-l item-flex nowrap flex" style="max-width:100px;" v-if="currentMedia.subtitles.length">
+									<label class="pad-l item-flex nowrap flex" style="max-width:100px;" v-if="selectedMedia.subtitles.length">
 										<div>cc:</div>
 										<div class="item-flex">
 											<select style="width:100%;" :disabled="isControlsDisabled" v-model="currentCcIndex">
 												<option value="-1">off</option>
-												<option v-for="cc,ccIndex in currentMedia.subtitles" :value="ccIndex">{{cc.filename}}</option>
+												<option v-for="cc,ccIndex in selectedMedia.subtitles" :value="ccIndex">{{cc.filename}}</option>
 											</select>
 										</div>
 									</label>
@@ -103,16 +92,16 @@
 					</div>
 
 					<div v-else>
-						<video ref="vidEl" :src="getDeliveryPath(currentMedia)" controls style="width:100%;" autoplay>
-							<track v-for="subtitle in currentMedia.subtitles" :src="getDeliveryPath(subtitle)" :label="subtitle">
+						<video ref="vidEl" :src="getDeliveryPath(selectedMedia)" controls style="width:100%;" autoplay>
+							<track v-for="subtitle in selectedMedia.subtitles" :src="getDeliveryPath(subtitle)" :label="subtitle">
 						</video>
 
 						<div>
-							<label v-if="currentMedia.subtitles.length">
+							<label v-if="selectedMedia.subtitles.length">
 								cc:
 								<select @change="activateSubtitle($event.target.value)">
 									<option value="-1">off</option>
-									<option v-for="cc,ccIndex in currentMedia.subtitles" :value="ccIndex">{{cc.filename}}</option>
+									<option v-for="cc,ccIndex in selectedMedia.subtitles" :value="ccIndex">{{cc.filename}}</option>
 								</select>
 							</label>
 						</div>
@@ -139,7 +128,7 @@
 						<div class="flex col">
 							<ul class="playlists is-blocks" ref="playlistsUl" style="height:100%;">
 								<li v-for="playlist,pIndex in playlists.list">
-									<button class="is-block" :class="{active:playlists.selectedPlaylist==pIndex}" @click="playlists.selectPlaylist(pIndex)">
+									<button class="is-block" :class="{active:playlists.selectedPlaylistIndex==pIndex}" @click="playlists.selectPlaylist(pIndex)">
 										<div class="flex">
 											<div class="ellipsis-overflow">
 												{{playlist.name}}
@@ -160,14 +149,14 @@
 					<div class="item-flex rel">
 						<div class="flex col">
 							<ul class="playlist is-blocks item-flex" ref="playlistUl">
-								<li v-if="!playlist.length">
+								<li v-if="!selectedPlaylist.media.length">
 									<div class="pad center">
 										No media
 									</div>
 								</li>
 			
-								<li v-for="media,mIndex in playlist">
-									<button class="is-block" :class="{active:$root.currentPlaylistIndex==mIndex}" @click="$root.selectMedia(mIndex)">
+								<li v-for="media,mIndex in selectedPlaylist.media">
+									<button class="is-block" :class="{active:selectedPlaylist.selectedMediaIndex==mIndex}" @click="$root.selectMedia(mIndex)">
 										<div class="flex">
 											<div class="item-flex ellipsis-overflow v-center">
 												<span>{{media.filename}}</span>
@@ -182,7 +171,7 @@
 											</div>
 			
 											<div style="margin:-0.5em 0;" class="pad-l">
-												<a class="list-btn red" @click.stop="$root.removeMediaFromPlaylist(mIndex)">
+												<a class="list-btn red" @click.stop="playlists.removeMedia(mIndex)">
 													<i class="material-icons small">cancel</i>
 												</a>
 											</div>
