@@ -30,7 +30,7 @@ const app=new Vue({
         playlists:playlists,
         statusInterval:false,
         currentDeviceStatus:"DISCONNECTED",
-        overlayComponent:false,
+        modal:false,
         mediaEditorIndex:-1
     },
     computed:{
@@ -152,10 +152,6 @@ const app=new Vue({
                 self.currentDeviceStatus="DISCONNECTED"
             })
         },
-        editMedia:function(mIndex){
-            this.mediaEditorIndex=mIndex
-            this.overlayComponent="editMedia"
-        },
         selectMedia:function(mediaIndex){
             this.playlists.selectMedia(mediaIndex)
 
@@ -228,6 +224,15 @@ const app=new Vue({
         },
         refreshDevices:function(){
             deviceDiscovery.update()
+        },
+        openModal:function(component,data){
+            this.modal={
+                component:component,
+                data:data
+            }
+        },
+        closeModal:function(){
+            this.modal=false
         }
     },
     mounted:function(){
@@ -261,7 +266,12 @@ Vue.component('playlist',{
         }
     },
     methods:{
-
+        editMedia:function(mIndex){
+            this.$root.openModal("editMedia",{
+                mediaIndex:mIndex,
+                playlistIndex:this.playlists.selectedPlaylistIndex
+            })
+        }
     },
     props:["playlist"],
     mounted:function(){
@@ -360,7 +370,7 @@ Vue.component('addTorrentMedia',{
                 this.addTorrentFileToPlaylist(this.selectedTorrentFiles[i])
             }
 
-            this.$root.overlayComponent=false;
+            this.$root.closeModal()
         },
         addAllTorrentFiles:function(){
             this.selectedTorrentFiles=_.map(this._torrentFiles,"name")
@@ -423,20 +433,17 @@ Vue.component('editMedia',{
     template:"#editMedia_template",
     data:function(){
         return {
-            newSubtitlesUrl:""
+            newSubtitlesUrl:"",
+            playlists:playlists
         }
     },
+    props:["mediaIndex","playlistIndex"],
     computed:{
         media:function(){
-            var mIndex=this.$root.mediaEditorIndex
+            var mediaIndex=this.mediaIndex
+            var playlistIndex=this.playlistIndex
 
-            if(mIndex>-1){
-                var media=this.$root.playlist[mIndex]
-
-                if(media) return media
-            }
-
-            return false
+            return playlists.getMedia(this.mediaIndex,this.playlistIndex)
         }
     },
     methods:{

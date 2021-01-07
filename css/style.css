@@ -130,7 +130,7 @@ ul.is-blocks > li{
     font-size:0.8rem;
 }
 
-.is-overlay{
+.is-modal{
     position:absolute;
     top:0;
     left:0;
@@ -142,11 +142,11 @@ ul.is-blocks > li{
     padding:2rem;
     z-index:1;
 }
-.overlay-component{
+.modal-component{
     background:#fff;
     padding:1rem;
 }
-.overlay-close{
+.modal-close{
     position:absolute;
     top:2.5rem;
     right:2.5rem;

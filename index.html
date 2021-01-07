@@ -109,10 +109,10 @@
 				</section>
 			</div>
 
-			<section class="overlay is-overlay" v-if="overlayComponent" @click.self="overlayComponent=false">
-				<component :is="overlayComponent" class="overlay-component"></component>
+			<section class="modal is-modal" v-if="modal" @click.self="closeModal()">
+				<component :is="modal.component" v-bind="modal.data" class="modal-component"></component>
 
-				<button class="a overlay-close" @click="overlayComponent=false">
+				<button class="a modal-close" @click="closeModal()">
 					<i class="material-icons small grey">close</i>
 				</button>
 			</section>
@@ -165,7 +165,7 @@
 											</div>
 			
 											<div class="pad-l">
-												<a class="list-btn" @click.stop="$root.editMedia(mIndex)">
+												<a class="list-btn" @click.stop="editMedia(mIndex)">
 													<i class="material-icons small">edit</i>
 												</a>
 											</div>
@@ -181,13 +181,11 @@
 							</ul>
 							
 							<div class="pad-t right">
-								<button @click="$root.overlayComponent='addTorrentMedia'">Add from torrent</button>
+								<button @click="$root.openModal('addTorrentMedia')">Add from torrent</button>
 							</div>
 						</div>
 					</div>
 				</div>
-
-
 			</section>
 		</script>
 				
@@ -235,7 +233,7 @@
 					<div class="pad-t right">
 						<button :disabled="!torrentFiles.length" @click="addAllTorrentFiles()">Add All</button>
 						<button :disabled="!torrentFiles.length||!selectedTorrentFiles.length" @click="addSelectedTorrentFiles()">Add Selected</button>
-						<button @click="$root.overlayComponent=false">Cancel</button>
+						<button @click="$root.closeModal()">Cancel</button>
 					</div>
 				</div>
 			</div>
