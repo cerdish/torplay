@@ -195,23 +195,25 @@
 			<div class="add-torrent-media">
 				<h1>Torrent / Magnet</h1>
 
-				<div class="flex">
-					<div class="item-flex has-dropdown">
-						<input :disabled="busy" type="text" v-model="torrentUrl" @focus="isShowHistory=true;console.log('test')" @blur="isShowHistory=false">
-
-						<ul class="torrentUrl-history is-dropdown is-blocks" v-if="isShowHistory">
-							<li v-for="url in torrentUrlHistory">
-								<button class="is-block ellipsis-overflow" v-if="url" @mousedown="torrentUrl=url;getTorrentFileList(url)">
-									{{url}}
-								</button>
-							</li>
-						</ul>
+				<form @submit.prevent="getTorrentFileList(torrentUrl)">
+					<div class="flex">
+						<div class="item-flex has-dropdown">
+							<input :disabled="busy" type="text" v-model="torrentUrl" @focus="isShowHistory=true;console.log('test')" @blur="isShowHistory=false">
+	
+							<ul class="torrentUrl-history is-dropdown is-blocks" v-if="isShowHistory">
+								<li v-for="url in torrentUrlHistory">
+									<button class="is-block ellipsis-overflow" v-if="url" @mousedown="torrentUrl=url;getTorrentFileList(url)">
+										{{url}}
+									</button>
+								</li>
+							</ul>
+						</div>
+	
+						<div>
+							<button :disabled="busy">Load Torrent Files</button>
+						</div>
 					</div>
-
-					<div>
-						<button :disabled="busy" @click="getTorrentFileList(torrentUrl)">Load Torrent Files</button>
-					</div>
-				</div>
+				</form>
 
 				<div class="pad-t">
 					<ul class="torrent-files is-blocks">
@@ -279,15 +281,17 @@
 					</li>
 				</ul>
 
-				<div class="pad-t flex">
+				<form @submit.prevent="addSubtitles(newSubtitlesUrl)">
+					<div class="pad-t flex">
 					<div class="item-flex">
-						<input type="text" v-model="newSubtitlesUrl">
+							<input type="text" v-model="newSubtitlesUrl">
+						</div>
+	
+						<div>
+							<button>Add Subtitles</button>
+						</div>
 					</div>
-
-					<div>
-						<button @click="addSubtitles(newSubtitlesUrl)">Add Subtitles</button>
-					</div>
-				</div>
+				</form>
 			</div>
 		</script>
 
@@ -295,21 +299,23 @@
 			<div class="add-playlist">
 				<h1>Add Playlist</h1>
 
-				<div class="pad-t flex">
-					<label class="item-flex flex">
-						<span>Name:</span>
-						
-						<div class="pad-l"></div>
-
-						<div class="item-flex">
-							<input type="text" v-model="playlistName">
+				<form @submit.prevent="playlistManager.addPlaylist({name:playlistName});$root.closeModal()">
+					<div class="pad-t flex">
+						<label class="item-flex flex">
+							<span>Name:</span>
+							
+							<div class="pad-l"></div>
+	
+							<div class="item-flex">
+								<input type="text" v-model="playlistName">
+							</div>
+						</label>
+	
+						<div>
+							<button>Add Playlist</button>
 						</div>
-					</label>
-
-					<div>
-						<button @click="playlistManager.addPlaylist({name:playlistName});$root.closeModal()">Add Playlist</button>
 					</div>
-				</div>
+				</form>
 			</div>
 		</script>
 
