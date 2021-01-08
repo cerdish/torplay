@@ -146,11 +146,13 @@ const app=new Vue({
                     var mediaIndex=_.findIndex(playlist.media,{isPlaying:true})
 
                     self.playingMedia.isPlaying=false
-                    
+
                     if(mediaIndex<playlist.media.length-1){
                         console.log("playing next item in playlist")
     
-                        self.selectItem(self.playlistManager.getMedia(mediaIndex+1))
+                        self.selectMedia(self.playlistManager.getMedia(mediaIndex+1))
+                    }else{
+                        self.playlistManager.storePlaylists()
                     }
                 })
             }
