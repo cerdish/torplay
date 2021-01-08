@@ -142,7 +142,7 @@ const app=new Vue({
                     self.playingMedia.currentTime=0
                     self.playingMedia.isComplete=true
 
-                    var playlist=self.playingMedia.getPlaylist()
+                    var playlist=self.playingMedia.getParent()
                     var mediaIndex=_.findIndex(playlist.media,{isPlaying:true})
 
                     self.playingMedia.isPlaying=false
@@ -168,8 +168,6 @@ const app=new Vue({
         selectMedia:function(media){
             this.playlistManager.selectMedia(media)
 
-            console.log("selecting media: ",media)
-
             this.playMedia(media)
         },
         playMedia:function(media){
@@ -193,9 +191,27 @@ const app=new Vue({
 
                 this.currentDeviceStatus="CONNECTING"
 
+                console.log("sending to chromecast: ",chromecastMedia)
+
                 this.currentDevice.play(chromecastMedia,{
                     startTime:media.currentTime || 0
+                },function(err){
+                    if(err) console.log("chromecast error: ",err)
+                    
+                    var sIndex=_.findIndex(media,{isSelected:true})
+
+                    self.changeSubtitles(sIndex,media)
                 })
+            }
+        },
+        changeSubtitles:function(sIndex,media){
+            sIndex=sIndex*1
+
+            if(sIndex==-1) this.currentDevice.subtitlesOff()
+            else{
+                this.currentDevice.changeSubtitles(sIndex)
+    
+                this.playlistManager.selectItem(media.subtitles[sIndex])
             }
         },
         getDeliveryPath:function(file){
@@ -465,11 +481,12 @@ Vue.component('local-video',{
     template:"#localVideo_template",
     data:function(){
         return {
+            playlistManager:playlistManager
         }
     },
     props:["media"],
     methods:{
-        activateSubtitle:function(index){
+        activateSubtitles:function(index,media){
             //activate subtites for local player
             var vidEl=this.$refs.vidEl
 
@@ -479,6 +496,9 @@ Vue.component('local-video',{
                     else vidEl.textTracks[i].mode="hidden"
                 }
             }
+
+            if(index>-1) this.playlistManager.selectItem(media.subtitles[index])
+            else this.playlistManager.deselectAll(media.subtitles)
         }
     }
 })

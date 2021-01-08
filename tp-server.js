@@ -102,7 +102,9 @@ torplayServer.prototype.listen = function (port,callback) {
 
 torplayServer.prototype.handleTorrentReq = function (req,res,filename,ext,type){
     var torrentFile=_.find(this.torrentEngine.files,function(f){
-        var fpath=url.parse(f.path).pathname
+        var fpath=decodeURI(url.parse(f.path).pathname)
+
+        console.log(fpath,filename)
         
         return "/"+fpath==filename
     })

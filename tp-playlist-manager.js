@@ -5,23 +5,33 @@ function PlaylistManager(playlists){
 
     this.playlists=[]
 
-    console.log(playlists)
+    console.log("loading playlists: ",playlists)
     
-    for(p of playlists){
-        console.log("p",p,p.media)
-
-        this.addPlaylist(p)
-
-        for(m of p.media){
-            this.addMedia(m)
+    try{
+        for(p of playlists){
+            this.addPlaylist(p)
         }
+    }catch(e){
+        this.storePlaylists(playlists)
     }
+    
     
     if(this.playlists.length==0) this.addPlaylist({name:"DEFAULT",isSelected:true})
 }
 
 PlaylistManager.prototype.addPlaylist = function (playlist){
+    var self=this
     var newPlaylist=new Playlist(playlist)
+
+    newPlaylist.getParent=function(){
+        return self
+    }
+
+    if(playlist.media instanceof Array){
+        for(m of playlist.media){
+            this.addMedia(m,newPlaylist)
+        }
+    }
 
     this.playlists.push(newPlaylist)
 
@@ -37,32 +47,18 @@ PlaylistManager.prototype.removePlaylist = function (playlistIndex){
 }
 
 PlaylistManager.prototype.selectPlaylist = function (playlist){
-    this.playlists.forEach(function(p){
-        p.isSelected=false
-    })
-
-    playlist.isSelected=true
-
-    this.storePlaylists()
-
-    return playlist
+    return this.selectItem(playlist,"playlists")
 }
 
 PlaylistManager.prototype.getSelectedPlaylist = function (){
     return _.find(this.playlists,{isSelected:true})
 }
 
-/*PlaylistManager.prototype.getPlaylist = function (playlistIndex){ 
-    if(this.playlists.length<=playlistIndex||playlistIndex<0) return false
-    
-    return this.playlists[playlistIndex]
-}
-
 PlaylistManager.prototype.getSelectedMedia = function (){
     var playlist=this.getSelectedPlaylist()
     
     return _.find(playlist.media,{isSelected:true})
-}*/
+}
 
 PlaylistManager.prototype.getMedia = function (mediaIndex,playlist){
     var playlist=playlist||this.getSelectedPlaylist()
@@ -75,24 +71,21 @@ PlaylistManager.prototype.getMedia = function (mediaIndex,playlist){
 PlaylistManager.prototype.addMedia = function (media,playlist){
     var playlist=playlist||this.getSelectedPlaylist()
     
-    if(typeof(media.currentTime)!="number") media.currentTime=0
-    if(typeof(media.duration)!="number") media.duration=0
-    if(typeof(media.subtitles)!="object") media.subtitles=[]
-    if(typeof(media.isComplete)!="boolean") media.isComplete=false
-    if(typeof(media.isSelected)!="boolean") media.isSelected=false
-    if(typeof(media.isPlaying)!="boolean") media.isPlaying=false
-
-    playlist.media.push(media)
-
-    media.getPlaylist=function(){
-        return playlist
+    var newMedia=new Media(media,playlist)
+    
+    if(media.subtitles instanceof Array&&media.subtitles.length){
+        for(s of media.subtitles){
+            this.addSubtitles(s,newMedia)
+        }
     }
+    
+    console.log("adding media: ",newMedia)
 
-    console.log("adding media: ",media)
+    playlist.media.push(newMedia)
 
     this.storePlaylists()
 
-    return media
+    return newMedia
 }
 
 PlaylistManager.prototype.removeMedia = function (mediaIndex,playlist){
@@ -104,17 +97,7 @@ PlaylistManager.prototype.removeMedia = function (mediaIndex,playlist){
 }
 
 PlaylistManager.prototype.selectMedia = function (media){
-    var playlist=media.getPlaylist()
-
-    playlist.media.forEach(function(m){
-        m.isSelected=false
-    })
-
-    media.isSelected=true
-
-    this.storePlaylists()
-
-    return media
+    return this.selectItem(media,"media")
 }
 
 PlaylistManager.prototype.playMedia = function (media){
@@ -131,15 +114,121 @@ PlaylistManager.prototype.playMedia = function (media){
     return media
 }
 
-PlaylistManager.prototype.storePlaylists = function (){
-    localStorage.playlists=JSON.stringify(this.playlists)
+PlaylistManager.prototype.addSubtitles = function (subtitles,media){
+    var media=media||this.getSelectedMedia()
+
+    var newSubtitles=new Subtitles(subtitles,media)
+    
+    media.subtitles.push(newSubtitles)
+
+    console.log("adding subtitles: ",newSubtitles)
+
+    this.storePlaylists()
+
+    return newSubtitles
 }
 
-function Playlist(playlist){
-    this.name=playlist.name||"DEFAULT"
-    //this.media=playlist.media||[]
-    this.isSelected=playlist.isSelected||false
-    this.media=[]
+PlaylistManager.prototype.removeSubtitles = function (subtitles){
+    var media=subtitles.getParent()
+
+    sIndex=_.findIndex(media.subtitles,{filename:subtitles.filename})
+
+    media.splice(sIndex,1)
+
+    this.storePlaylists()
+}
+
+PlaylistManager.prototype.selectSubtitles = function(subtitles){
+    return this.selectItem(subtitles,"subtitles")
+}
+
+PlaylistManager.prototype.selectItem = function (item){
+    var parent=item.getParent()
+
+    console.log("selecting "+item.itemKey+" :",item)
+
+    this.deselectAll(parent[item.itemKey])
+
+    item.isSelected=true
+
+    this.storePlaylists()
+
+    return item
+}
+
+PlaylistManager.prototype.deselectAll = function (array){
+    array.forEach(function(o){
+        o.isSelected=false
+    })
+}
+
+PlaylistManager.prototype.storePlaylists = function (playlists){
+    playlists=playlists||this.playlists
+
+    localStorage.playlists=JSON.stringify(playlists)
+}
+
+function computeDisplayName(filename){
+    var displayName=filename
+    if(filename.indexOf("/")>-1) displayName=filename.substr(filename.lastIndexOf("/")+1)
+    if(filename.indexOf("\\")>-1)displayName=displayName.substr(filename.lastIndexOf("\\")+1)
+
+    return displayName
+}
+
+class Item{
+    constructor(itemKey,obj,parent){
+        this.isSelected=false,
+        this.itemKey=itemKey
+
+        if(typeof(obj)=="object"){
+            this.isSelected=obj.isSelected||false
+        }
+
+        this.getParent=function(){
+            return parent
+        }
+    }
+}
+
+class Playlist extends Item{
+    constructor(playlist,parent){
+        super("playlists",playlist,parent)
+
+        this.name=playlist.name||"DEFAULT"
+        this.media=[]
+        this.isSelected=playlist.isSelected||false
+    }
+}
+
+class Media extends Item{
+    constructor(media,parent){
+        super("media",media,parent)
+
+        this.filename=media.filename||"DEFAULT"
+        this.torrentUrl=media.torrentUrl||false
+        this.fileUrl=media.fileUrl||false
+        this.filePath=media.filePath||false
+
+        this.currentTime=media.currentTime||0
+        this.duration=media.duration||0
+        this.isComplete=media.isComplete||false
+        this.isPlaying=media.isPlaying||false
+        this.displayName=media.displayName||computeDisplayName(media.filename)
+        this.subtitles=[]
+    }
+}
+
+class Subtitles extends Item{
+    constructor(subtitles,parent){
+        super("subtitles",subtitles,parent)
+
+        this.filename=subtitles.filename||"DEFAULT"
+        this.torrentUrl=subtitles.torrentUrl||false
+        this.fileUrl=subtitles.fileUrl||false
+        this.filePath=subtitles.filePath||false
+        this.displayName=subtitles.displayName||computeDisplayName(subtitles.filename)
+    }
 }
 
 module.exports = PlaylistManager

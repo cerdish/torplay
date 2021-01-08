@@ -79,10 +79,11 @@
 
 									<label class="pad-l item-flex nowrap flex" style="max-width:100px;" v-if="playingMedia.subtitles.length">
 										<div>cc:</div>
+										
 										<div class="item-flex">
-											<select style="width:100%;" :disabled="isControlsDisabled" v-model="playingMedia.selectedCaptionsIndex" @change="currentDevice.changeSubtitles(playingMedia.selectedCaptionsIndex);console.log(playingMedia.selectedCaptionsIndex)">
+											<select style="width:100%;" :disabled="isControlsDisabled" @change="changeSubtitles($event.target.value,playingMedia);">
 												<option value="-1">off</option>
-												<option v-for="cc,ccIndex in playingMedia.subtitles" :value="ccIndex">{{cc.filename}}</option>
+												<option v-for="subtitles,sIndex in playingMedia.subtitles" :value="sIndex" :selected="subtitles.isSelected">{{subtitles.displayName}}</option>
 											</select>
 										</div>
 									</label>
@@ -159,7 +160,7 @@
 											</div>
 
 											<div class="item-flex ellipsis-overflow v-center">
-												<span>{{media.filename}}</span>
+												<span>{{media.displayName}}</span>
 			
 												<i class="material-icons light-grey small" v-if="media.subtitles.length">closed_caption</i>
 												<i class="material-icons green small" v-if="media.isComplete">done</i>
@@ -265,11 +266,11 @@
 						<button class="is-block">
 							<div class="flex">
 								<div class="item-flex">
-									{{subtitles.filename}}
+									{{subtitles.displayName}}
 								</div>
 
 								<div class="pad-l">
-									<a @click="removeSubtitles(sIndex)">
+									<a @click="playlistManager.removeSubtitles(subtitles)">
 										<i class="material-icons small red">close</i>
 									</a>
 								</div>
@@ -321,9 +322,9 @@
 				<div>
 					<label v-if="media.subtitles.length">
 						cc:
-						<select @change="activateSubtitle($event.target.value)">
+						<select @change="activateSubtitles($event.target.value,media)">
 							<option value="-1">off</option>
-							<option v-for="cc,ccIndex in media.subtitles" :value="ccIndex">{{cc.filename}}</option>
+							<option v-for="subtitles,sIndex in media.subtitles" :value="sIndex">{{subtitles.displayName}}</option>
 						</select>
 					</label>
 				</div>
