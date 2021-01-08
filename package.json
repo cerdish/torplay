@@ -1,20 +1,57 @@
 {
   "name": "torplay",
+  "productName": "torplay",
   "version": "0.0.2",
   "description": "Streams torrents.",
   "main": "main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "make": "electron-forge make"
+  },
+  "author": {
+    "name": "Andrew Claasen",
+    "email": "andrew@mrclaasen.com"
+  },
+  "license": "MIT",
+  "config": {
+    "forge": {
+      "packagerConfig": {},
+      "makers": [
+        {
+          "name": "@electron-forge/maker-squirrel",
+          "config": {
+            "name": "package_size_tests"
+          }
+        },
+        {
+          "name": "@electron-forge/maker-zip",
+          "platforms": [
+            "darwin"
+          ]
+        },
+        {
+          "name": "@electron-forge/maker-deb",
+          "config": {}
+        },
+        {
+          "name": "@electron-forge/maker-rpm",
+          "config": {}
+        }
+      ]
+    }
   },
   "repository": "",
   "keywords": [],
-  "author": "",
-  "license": "",
   "devDependencies": {
     "electron": "^11.1.1",
-    "@electron-forge/cli": "^6.0.0-beta.54"
+    "@electron-forge/cli": "^6.0.0-beta.54",
+    "@electron-forge/maker-deb": "^6.0.0-beta.54",
+    "@electron-forge/maker-rpm": "^6.0.0-beta.54",
+    "@electron-forge/maker-squirrel": "^6.0.0-beta.54",
+    "@electron-forge/maker-zip": "^6.0.0-beta.54"
   },
   "dependencies": {
+    "electron-squirrel-startup": "^1.0.0",
     "axios": "^0.21.1",
     "chromecast-api": "^0.3.4",
     "lodash": "^4.17.20",
