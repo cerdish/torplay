@@ -119,7 +119,7 @@
 						<div class="flex col">
 							<ul class="playlists is-blocks" ref="playlistsUl" style="height:100%;">
 								<li v-for="playlist,pIndex in playlistManager.playlists">
-									<button class="is-block" :class="{active:playlist.isSelected}" @click="playlistManager.selectPlaylist(playlist)">
+									<button class="is-block" :class="{active:playlist.isSelected}" @click="playlistManager.selectItem(playlist)">
 										<div class="flex">
 											<div class="ellipsis-overflow item-flex">
 												{{playlist.name}}

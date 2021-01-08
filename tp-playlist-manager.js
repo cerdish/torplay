@@ -46,10 +46,6 @@ PlaylistManager.prototype.removePlaylist = function (playlistIndex){
     this.storePlaylists()
 }
 
-PlaylistManager.prototype.selectPlaylist = function (playlist){
-    return this.selectItem(playlist,"playlists")
-}
-
 PlaylistManager.prototype.getSelectedPlaylist = function (){
     return _.find(this.playlists,{isSelected:true})
 }
@@ -94,10 +90,6 @@ PlaylistManager.prototype.removeMedia = function (mediaIndex,playlist){
     playlist.media.splice(mediaIndex,1)
 
     this.storePlaylists()
-}
-
-PlaylistManager.prototype.selectMedia = function (media){
-    return this.selectItem(media,"media")
 }
 
 PlaylistManager.prototype.playMedia = function (media){

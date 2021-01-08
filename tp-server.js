@@ -94,7 +94,7 @@ torplayServer.prototype.listen = function (port,callback) {
         //give the server a litteral second to spin up before we start sending reqeusts to it
         setTimeout(function(){
             self.isServerRunning=true
-        },1000)
+        },500)
 
         if(callback) callback()
     })

@@ -150,7 +150,7 @@ const app=new Vue({
                     if(mediaIndex<playlist.media.length-1){
                         console.log("playing next item in playlist")
     
-                        self.selectMedia(self.playlistManager.getMedia(mediaIndex+1))
+                        self.selectItem(self.playlistManager.getMedia(mediaIndex+1))
                     }
                 })
             }
@@ -166,7 +166,7 @@ const app=new Vue({
             })
         },
         selectMedia:function(media){
-            this.playlistManager.selectMedia(media)
+            this.playlistManager.selectItem(media)
 
             this.playMedia(media)
         },
@@ -198,7 +198,7 @@ const app=new Vue({
                 },function(err){
                     if(err) console.log("chromecast error: ",err)
                     
-                    var sIndex=_.findIndex(media,{isSelected:true})
+                    var sIndex=_.findIndex(media.subtitles,{isSelected:true})
 
                     self.changeSubtitles(sIndex,media)
                 })
