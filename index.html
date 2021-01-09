@@ -45,49 +45,49 @@
 						<div class="item-flex">
 							<div class="ellipsis-overflow bold pad-b" style="width:100%;">{{playingMedia ? playingMedia.displayName : "no media selected"}}</div>
 							
-							<div v-if="!currentDevice.client">
-								<button @click="playMedia(playingMedia)">launch media receiver</button>
+							<div>
+								<input :disabled="isControlsDisabled" type="range" min="0" :max="playingMedia.duration" step="1" v-model="playingMedia.currentTime" @change="currentDevice.seekTo($event.target.value)">
 							</div>
-			
-							<div v-else-if="isShowDeviceControls">
+
+							<div class="flex">
+								<div v-if="!currentDevice.client">
+									<button class="a" @click="playMedia(playingMedia)">
+										<i class="material-icons large">play_circle</i>
+									</button>
+								</div>
+
+								<div v-else-if="currentDeviceStatus=='PAUSED'">
+									<button :disabled="isControlsDisabled" class="a" @click="currentDevice.resume()">
+										<i class="material-icons large">play_circle</i>
+									</button>
+								</div>
+
+								<div v-else>
+									<button :disabled="isControlsDisabled" class="a" @click="currentDevice.pause()">
+										<i class="material-icons large">pause_circle</i>
+									</button>
+								</div>
+
 								<div>
-									<input :disabled="isControlsDisabled" type="range" min="0" :max="playingMedia.duration" step="1" v-model="playingMedia.currentTime" @change="currentDevice.seekTo($event.target.value)">
+									<button class="a" :disabled="currentDeviceStatus=='CONNECTING'||currentDeviceStatus=='DISCONNECTED'" @click="closeDeviceConnection(currentDevice)">
+										<i class="material-icons large">cancel</i>
+									</button>
 								</div>
 
-								<div class="flex">
-									<div v-if="currentDeviceStatus=='PAUSED'">
-										<button :disabled="isControlsDisabled" class="a" @click="currentDevice.resume()">
-											<i class="material-icons large">play_circle</i>
-										</button>
-									</div>
-
-									<div v-else>
-										<button :disabled="isControlsDisabled" class="a" @click="currentDevice.pause()">
-											<i class="material-icons large">pause_circle</i>
-										</button>
-									</div>
-
-									<div>
-										<button class="a" @click="closeDeviceConnection(currentDevice)">
-											<i class="material-icons large">cancel</i>
-										</button>
-									</div>
-
-									<div class="pad-l ellipsis-overflow item-flex">
-										{{seconds2timecode(playingMedia.currentTime)}} / {{seconds2timecode(playingMedia.duration)}}
-									</div>
-
-									<label class="pad-l item-flex nowrap flex" style="max-width:100px;" v-if="playingMedia.subtitles.length">
-										<div>cc:</div>
-										
-										<div class="item-flex">
-											<select style="width:100%;" :disabled="isControlsDisabled" @change="changeSubtitles($event.target.value,playingMedia);">
-												<option value="-1">off</option>
-												<option v-for="subtitles,sIndex in playingMedia.subtitles" :value="sIndex" :selected="subtitles.isSelected">{{subtitles.displayName}}</option>
-											</select>
-										</div>
-									</label>
+								<div class="pad-l ellipsis-overflow item-flex">
+									{{seconds2timecode(playingMedia.currentTime)}} / {{seconds2timecode(playingMedia.duration)}}
 								</div>
+
+								<label class="pad-l item-flex nowrap flex" style="max-width:100px;" v-if="playingMedia.subtitles.length">
+									<div>cc:</div>
+									
+									<div class="item-flex">
+										<select style="width:100%;" :disabled="isControlsDisabled" @change="changeSubtitles($event.target.value,playingMedia);">
+											<option value="-1">off</option>
+											<option v-for="subtitles,sIndex in playingMedia.subtitles" :value="sIndex" :selected="subtitles.isSelected">{{subtitles.displayName}}</option>
+										</select>
+									</div>
+								</label>
 							</div>
 						</div>
 					</div>
@@ -345,7 +345,7 @@
 						cc:
 						<select @change="activateSubtitles($event.target.value,media)">
 							<option value="-1">off</option>
-							<option v-for="subtitles,sIndex in media.subtitles" :value="sIndex">{{subtitles.displayName}}</option>
+							<option v-for="subtitles,sIndex in media.subtitles" :selected="subtitles.isSelected" :value="sIndex">{{subtitles.displayName}}</option>
 						</select>
 					</label>
 				</div>

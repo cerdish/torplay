@@ -69,15 +69,10 @@ const app=new Vue({
 
             return media
         },
-        isShowDeviceControls:function(){
-            var status=this.currentDeviceStatus
-
-            return ["PLAYING","BUFFERING","PAUSED","IDLE"].indexOf(status) > -1
-        },
         isControlsDisabled:function(){
             var status=this.currentDeviceStatus
 
-            return ["BUFFERING","IDLE"].indexOf(status) > -1
+            return ["PLAYING","PAUSED"].indexOf(status) == -1
         },
         selectedPlaylist:function(){
             return _.find(this.playlistManager.playlists,{isSelected:true})
@@ -513,5 +508,14 @@ Vue.component('local-video',{
             if(index>-1) this.playlistManager.selectItem(media.subtitles[index])
             else this.playlistManager.deselectAll(media.subtitles)
         }
+    },
+    mounted:function(){
+        var self=this
+        var vidEl=this.$refs.vidEl
+
+        //activate subs once the player plays if they are remembered to be activated. only the first time the vid plays
+        vidEl.addEventListener("play",function(e){
+            self.activateSubtitles(_.findIndex(self.media.subtitles,{isSelected:true}),self.media)
+        },{once:true})
     }
 })
