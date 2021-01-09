@@ -43,7 +43,7 @@
 						<div v-if="playingMedia.poster" class="media-poster" :style="'background:url('+getDeliveryPath(playingMedia.poster)+') 100% / cover no-repeat;'"></div>
 
 						<div class="item-flex">
-							<div class="ellipsis-overflow bold pad-b">{{playingMedia ? playingMedia.filename : "no media selected"}}</div>
+							<div class="ellipsis-overflow bold pad-b" style="width:100%;">{{playingMedia ? playingMedia.displayName : "no media selected"}}</div>
 							
 							<div v-if="!currentDevice.client">
 								<button @click="playMedia(playingMedia)">launch media receiver</button>
@@ -95,6 +95,21 @@
 					<div v-else>
 						<button @click="openModal('local-video',{media:playingMedia})">Launch Video Player</button>
 					</div>
+				</section>
+
+				<section class="torrent-stats padding-t" v-if="swarmStats&&swarmStats.files.length">
+					<div class="flex">
+						<div class="bold pad-r">Downloading files:</div>
+
+						<div class="item-flex">
+							<progress style="width:100%;" :value="swarmStats.downloaded" :max="swarmStats.downloadSize"></progress>
+						</div>
+
+						<div class="pad-l right" style="min-width:75px;">
+							{{Math.round(swarmStats.downloadSpeed/1024)}} kb/s
+						</div>
+					</div>
+					<div v-for="file in swarmStats.files" class="ellipsis-overflow">{{file.path}}</div>
 				</section>
 			</div>
 

@@ -25,18 +25,18 @@ function torplayServer(){
     self.torrentEngine=false
 
     self.server=http.createServer(function(req,res){
-        const urlInfo = url.parse(req.url,true)
-        const pathname = urlInfo.pathname
+        var urlInfo = url.parse(req.url,true)
+        var pathname = urlInfo.pathname
 
-        const filename=decodeURI(pathname)
-        const type=mime.getType(filename)
-        const ext=mime.getExtension(type)
+        var filename=decodeURI(pathname)
+        var type=mime.getType(filename)
+        var ext=mime.getExtension(type)
         
         console.log("starting request: "+filename+" range: "+req.headers.range)
 
-        const torrentUrl=urlInfo.query.torrentUrl ? atob(urlInfo.query.torrentUrl) : false
-        const httpUrl=urlInfo.query.httpUrl ? atob(urlInfo.query.httpUrl) : false
-        const filePath=urlInfo.query.filePath ? atob(urlInfo.query.filePath) : false
+        var torrentUrl=urlInfo.query.torrentUrl ? atob(urlInfo.query.torrentUrl) : false
+        var httpUrl=urlInfo.query.httpUrl ? atob(urlInfo.query.httpUrl) : false
+        var filePath=urlInfo.query.filePath ? atob(urlInfo.query.filePath) : false
 
         if(torrentUrl){
             var torrentEngine=self.torrentEngine
@@ -57,6 +57,9 @@ function torplayServer(){
             self.handleHttpReq(httpUrl,req,res,filename,ext,type)
         }else if(filePath){
             self.handleFileReq(filePath,req,res,filename,ext,type)
+        }else if(filename=="/stats.json"){
+            //get torrent download stats
+            self.handleStatsReq(req,res)
         }else{
             self.handleNotFoundReq(req,res,filename)
         }
@@ -73,7 +76,7 @@ torplayServer.prototype.startEngine = function (torrentUrl,callback,callbackArgs
     readTorrent(torrentUrl,function(e,torrent){
         if(e) console.log(e)
 
-        self.torrentEngine=torrentStream(torrent)
+        self.torrentEngine=torrentStream(torrent,{uploads:0})
         //store the torrent url here so we can match it later to see if we are running the corrent torrent engine
         self.torrentEngine.torrentUrl=torrentUrl
 
@@ -103,8 +106,6 @@ torplayServer.prototype.listen = function (port,callback) {
 torplayServer.prototype.handleTorrentReq = function (req,res,filename,ext,type){
     var torrentFile=_.find(this.torrentEngine.files,function(f){
         var fpath=decodeURI(url.parse(f.path).pathname)
-
-        console.log(fpath,filename)
         
         return "/"+fpath==filename
     })
@@ -228,6 +229,53 @@ torplayServer.prototype.deliverFile = function (stream,req,res,filename,ext,type
     stream.pipe(res)
 }
 
+torplayServer.prototype.handleStatsReq = function (req,res){
+    var self=this
+    var swarmStats=false
+
+    res.setHeader("Content-Type","text/json")
+
+    if(this.torrentEngine){
+        var engine=this.torrentEngine
+    
+        var allPeers=engine.swarm.wires
+    
+        var activePeers=allPeers.filter(function(wire){
+            return !wire.peerChoking
+        })
+    
+        var activeFiles=engine.files.filter(function(f){
+            return f.isSelected
+        })
+    
+        var downloadSize=activeFiles.reduce(function(prevFileLength,currFile) {
+            return prevFileLength + currFile.length
+        },0)
+    
+        var swarmStats={
+            downloadSize:downloadSize,
+            downloaded:engine.swarm.downloaded,
+            uploaded:engine.swarm.uploaded,
+            downloadSpeed:parseInt(engine.swarm.downloadSpeed(), 10),
+            uploadSpeed:parseInt(engine.swarm.uploadSpeed(), 10),
+            totalPeers:allPeers.length,
+            activePeers:activePeers.length,
+            files:activeFiles.map(function(f){
+                return {
+                    path:f.path,
+                    deliveryPath:self.getDeliveryPath({
+                        filename:f.path,
+                        torrentUrl:engine.torrentUrl
+                    })
+                }
+            })
+        }
+    }
+    
+    res.write(JSON.stringify({swarmStats:swarmStats}))
+    res.end()
+}
+
 torplayServer.prototype.handleNotFoundReq = function (req,res,filename){
     console.log("not found: "+filename)
     res.end()
@@ -246,7 +294,7 @@ torplayServer.prototype.close = function (callback) {
 }
 
 torplayServer.prototype.getDeliveryPath = function (file){
-    var mediaDeliveryPath="http://" + address() + ":8080/" + url.parse(file.filename).pathname
+    var mediaDeliveryPath="http://" + address() + ":8080/" + file.filename.replace("\\","/")
     
     var type=mime.getType(file.filename)
     var ext=mime.getExtension(type)
@@ -260,7 +308,7 @@ torplayServer.prototype.getDeliveryPath = function (file){
 
     if(file.filePath) mediaDeliveryPath+="?filePath=" + encodeURI(btoa(file.filePath))
 
-    console.log(mediaDeliveryPath)
+    //console.log(mediaDeliveryPath)
     
     return mediaDeliveryPath 
 }

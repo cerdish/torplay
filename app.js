@@ -9,6 +9,7 @@ const validUrl = require('valid-url')
 const url = require('url')
 const torplayServer = require('./tp-server.js')
 const PlaylistManager = require('./tp-playlist-manager.js')
+const axios = require('axios')
 
 //supported file formats for chromecast
 const STATUS_INTERVAL_DURATION=1000
@@ -31,7 +32,8 @@ const app=new Vue({
         statusInterval:false,
         currentDeviceStatus:"DISCONNECTED",
         modal:false,
-        mediaEditorIndex:-1
+        mediaEditorIndex:-1,
+        swarmStats:false
     },
     computed:{
         currentDevice:function(){
@@ -253,6 +255,11 @@ const app=new Vue({
         },
         closeModal:function(){
             this.modal=false
+        },
+        getSwarmStats:function(){
+            axios.get(server.getDeliveryPath({filename:"stats.json"})).then(function(r){
+                this.swarmStats=r.data.swarmStats
+            }.bind(this))
         }
     },
     mounted:function(){
@@ -266,6 +273,10 @@ const app=new Vue({
                 self.selectDevice(device.name)
             }
         })
+
+        setInterval(function(){
+            self.getSwarmStats()
+        },1000)
 
         this.server.listen(8080)
     }
