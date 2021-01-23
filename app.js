@@ -227,6 +227,14 @@ const app=new Vue({
                         if(e) console.log(e)
     
                         if(s&&self.playingMedia&&s.media){
+                            if(self.server.getDeliveryPath(self.playingMedia)!=s.media.contentId){
+                                self.playingMedia.isPlaying=false
+
+                                console.log("turn off media:",self.playingMedia)
+
+                                return false
+                            }
+
                             self.playingMedia.currentTime=s.currentTime
                             self.playingMedia.duration=s.media.duration
     
@@ -452,26 +460,6 @@ Vue.component('editMedia',{
         removeSubtitles:function(sIndex){
             this.media.subtitles.splice(sIndex,1)
         }
-    },
-    mounted:function(){
-        this.$refs.subtitlesUl.addEventListener('drop', (e) => {
-            e.preventDefault()
-            e.stopPropagation()
-        
-            for(const f of e.dataTransfer.files){
-                var type=mime.getType(f.path)
-                var ext=mime.getExtension(type)
-        
-                if(server.SUPPORTED_CAPTION_FORMATS.indexOf(ext)>-1) this.media.subtitles.push({
-                    filename:f.path.substr(f.path.lastIndexOf("\\")+1),
-                    filePath:f.path
-                })
-            }
-        })
-        this.$refs.subtitlesUl.addEventListener('dragover', (e) => {
-            e.preventDefault()
-            e.stopPropagation()
-        })
     }
 })
 
@@ -518,4 +506,39 @@ Vue.component('local-video',{
             self.activateSubtitles(_.findIndex(self.media.subtitles,{isSelected:true}),self.media)
         },{once:true})
     }
+})
+
+var doc=document.body
+
+doc.addEventListener('drop', (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+
+    for(const f of e.dataTransfer.files){
+        var type=mime.getType(f.path)
+        var ext=mime.getExtension(type)
+
+        if(server.SUPPORTED_CAPTION_FORMATS.indexOf(ext)>-1) this.media.subtitles.push({
+            filename:f.path.substr(f.path.lastIndexOf("\\")+1),
+            filePath:f.path
+        })
+    }
+})
+doc.addEventListener('dragover', (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+})
+doc.addEventListener('dragenter', (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+
+    console.log("drag enter")
+})
+doc.addEventListener('dragend', (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+
+    console.log(e)
+
+    console.log("drag end")
 })
