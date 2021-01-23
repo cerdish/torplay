@@ -8,5 +8,5 @@ Stream torrents, magnet links, or local files to chromcast devices or local comp
 * run the code directly
 > npm start
 
-* build and installer and a folder with executeable
+* build the app (folder with dependencies and an executeable) and create an installer
 > npm run make
