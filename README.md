@@ -4,15 +4,20 @@ Stream torrents, magnet links, or local files to chromcast devices or local comp
 
 ## Setup
 
-* install dependencies
-> npm install
+install dependencies
+```
+npm install
+```
 
-* run the code directly
-> npm start
+run the code directly
+```
+npm start
+```
 
-* build the app (folder with dependencies and an executeable) and create an installer
-> npm run make
-
+build the app (folder with dependencies and an executeable) and create an installer
+```
+npm run make
+```
 
 ## To Do
 
