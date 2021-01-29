@@ -476,7 +476,10 @@ Vue.component('add-torrent-media',{
         }
     },
     mounted:function(){
-        if(this.initUrl) this.getTorrentFileList(this.initUrl)
+        if(this.initUrl){
+            this.torrentUrl=this.initUrl
+            this.getTorrentFileList(this.torrentUrl)
+        }
     }
 })
 

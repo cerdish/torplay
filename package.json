@@ -1,7 +1,7 @@
 {
   "name": "torplay",
   "productName": "torplay",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Streams torrents.",
   "main": "main.js",
   "scripts": {
@@ -12,7 +12,6 @@
     "name": "Andrew Claasen",
     "email": "andrew@mrclaasen.com"
   },
-  "homepage":"https://cerdish.github.io/torplay-website/",
   "license": "ISC",
   "config": {
     "forge": {
