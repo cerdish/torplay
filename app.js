@@ -10,6 +10,8 @@ const url = require('url')
 const torplayServer = require('./tp-server.js')
 const PlaylistManager = require('./tp-playlist-manager.js')
 const axios = require('axios')
+const TorrentSearchApi = require('torrent-search-api')
+TorrentSearchApi.enableProvider('Rarbg')
 
 //supported file formats for chromecast
 const STATUS_INTERVAL_DURATION=1000
@@ -305,8 +307,43 @@ Vue.component('playlist',{
     props:["playlist"]
 })
 
-Vue.component('addTorrentMedia',{
-    template:"#addTorrentMedia_template",
+Vue.component('find-torrents',{
+    template:"#find-torrents_template",
+    data:function(){
+        return {
+            search:"",
+            torrents:[],
+            torrentSearchHistory:JSON.parse(localStorage.torrentSearchHistory||"[]"),
+            busy:false,
+            isShowHistory:false
+        }
+    },
+    methods:{
+        findTorrents:async function(search){
+            this.busy=true
+
+            this.addSearchToHistory(search.replace(/[^\w]/g,"."))
+
+            var results=await TorrentSearchApi.search(search)
+
+            console.log(results)
+
+            this.busy=false
+
+            this.torrents=results
+        },
+        addSearchToHistory:function(search){
+            if(this.torrentSearchHistory.indexOf(search)==-1) this.torrentSearchHistory.unshift(search)
+
+            this.torrentSearchHistory=this.torrentSearchHistory.slice(0,20)
+
+            localStorage.torrentSearchHistory=JSON.stringify(this.torrentSearchHistory)
+        }
+    }
+})
+
+Vue.component('add-torrent-media',{
+    template:"#add-torrent-media_template",
     data:function(){
         return {
             torrentUrl:"",
@@ -316,6 +353,11 @@ Vue.component('addTorrentMedia',{
             torrentUrlHistory:JSON.parse(localStorage.torrentUrlHistory||"[]"),
             isShowHistory:false,
             playlistManager:playlistManager
+        }
+    },
+    props:{
+        initUrl:{
+            default:""
         }
     },
     computed:{
@@ -432,6 +474,9 @@ Vue.component('addTorrentMedia',{
 
             this.playlistManager.addMedia({torrentUrl:this.torrentUrl,filename:filename,subtitles:subtitles,poster:poster})
         }
+    },
+    mounted:function(){
+        if(this.initUrl) this.getTorrentFileList(this.initUrl)
     }
 })
 

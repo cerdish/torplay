@@ -198,7 +198,8 @@
 							</ul>
 							
 							<div class="pad-t right">
-								<button @click="$root.openModal('addTorrentMedia')">Add from torrent</button>
+								<button @click="$root.openModal('find-torrents')">Find torrents</button>
+								<button @click="$root.openModal('add-torrent-media')">Add from torrent</button>
 							</div>
 						</div>
 					</div>
@@ -206,14 +207,68 @@
 			</section>
 		</script>
 				
-		<script type="text/x-template" id="addTorrentMedia_template">
+		<script type="text/x-template" id="find-torrents_template">
+			<div class="find-torrents">
+				<h1>Find Torrents</h1>
+
+				<form @submit.prevent="findTorrents(search)">
+					<div class="flex">
+						<div class="item-flex has-dropdown">
+							<input :disabled="busy" type="text" v-model="search" @focus="isShowHistory=true" @blur="isShowHistory=false">
+	
+							<ul class="torrent-search-history is-dropdown is-blocks" v-if="isShowHistory&&torrentSearchHistory.length">
+								<li v-for="s in torrentSearchHistory">
+									<button class="is-block ellipsis-overflow" v-if="s" @mousedown="search=s;findTorrents(s)">
+										{{s}}
+									</button>
+								</li>
+							</ul>
+						</div>
+	
+						<div>
+							<button :disabled="busy">Find Torrents</button>
+						</div>
+					</div>
+				</form>
+
+				<div class="pad-t">
+					<ul class="torrents is-blocks">
+						<li v-if="!torrents.length">
+							<div class="pad center">
+								{{busy ? 'Finding torrents...' : 'No torrents found'}}
+							</div>
+						</li>
+	
+						<li v-for="torrent in torrents" v-else>
+							<button class="is-block" @click="$root.openModal('add-torrent-media',{initUrl:torrent.magnet})">
+								<div class="flex">
+									<div class="item-flex ellipsis-overflow">
+										{{torrent.title}}
+									</div>
+
+									<div class="pad-l center ellipsis-overflow" style="width:75px;">
+										p:{{torrent.peers}} / s:{{torrent.seeds}}
+									</div>
+
+									<div class="pad-l center ellipsis-overflow" style="width:75px;">
+										{{torrent.size}}
+									</div>
+								</div>
+							</button>
+						</li>
+					</ul>
+				</div>
+			</div>
+		</script>
+
+		<script type="text/x-template" id="add-torrent-media_template">
 			<div class="add-torrent-media">
 				<h1>Torrent / Magnet</h1>
 
 				<form @submit.prevent="getTorrentFileList(torrentUrl)">
 					<div class="flex">
 						<div class="item-flex has-dropdown">
-							<input :disabled="busy" type="text" v-model="torrentUrl" @focus="isShowHistory=true;console.log('test')" @blur="isShowHistory=false">
+							<input :disabled="busy" type="text" v-model="torrentUrl" @focus="isShowHistory=true;" @blur="isShowHistory=false">
 	
 							<ul class="torrentUrl-history is-dropdown is-blocks" v-if="isShowHistory">
 								<li v-for="url in torrentUrlHistory">

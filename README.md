@@ -21,9 +21,11 @@ npm run make
 
 ## To Do
 
+- [x] Add seach functionality for finding torrents
 - [ ] Detect the clipboard contents and if it is a torrent / magnet show the file list
 - [ ] Drag and drop torrents / magnets / local files onto the app and let it figure out what to do with them
 - [ ] Edit playlist names
 - [ ] Edit playlist order
+- [ ] Add remote control panel (access from browser of device on same network)
 - [ ] Youtube support?
 - [ ] AppleTV / SmartTV support?

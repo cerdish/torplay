@@ -1,7 +1,7 @@
 {
   "name": "torplay",
   "productName": "torplay",
-  "version": "0.0.3",
+  "version": "0.1.0",
   "description": "Streams torrents.",
   "main": "main.js",
   "scripts": {
@@ -51,9 +51,9 @@
     "@electron-forge/maker-zip": "^6.0.0-beta.54"
   },
   "dependencies": {
-    "electron-squirrel-startup": "^1.0.0",
     "axios": "^0.21.1",
     "chromecast-api": "^0.3.4",
+    "electron-squirrel-startup": "^1.0.0",
     "lodash": "^4.17.20",
     "mime": "^2.4.7",
     "network-address": "^1.1.2",
@@ -61,6 +61,7 @@
     "read-torrent": "^1.3.1",
     "seconds2timecode": "0.0.2",
     "srt-to-vtt": "^1.1.3",
+    "torrent-search-api": "^2.1.3",
     "torrent-stream": "^1.2.1",
     "valid-url": "^1.0.9",
     "vue": "^2.6.12"
