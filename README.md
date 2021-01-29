@@ -22,6 +22,7 @@ npm run make
 ## To Do
 
 - [x] Add seach functionality for finding torrents
+- [ ] Add providers dropdown for search
 - [ ] Detect the clipboard contents and if it is a torrent / magnet show the file list
 - [ ] Drag and drop torrents / magnets / local files onto the app and let it figure out what to do with them
 - [ ] Edit playlist names
@@ -29,3 +30,8 @@ npm run make
 - [ ] Add remote control panel (access from browser of device on same network)
 - [ ] Youtube support?
 - [ ] AppleTV / SmartTV support?
+
+## Special Thanks
+
+* [peerflix](https://github.com/mafintosh/peerflix)
+* [TorrenTV](https://github.com/TorrenTV/TorrenTV)
