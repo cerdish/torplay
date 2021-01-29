@@ -33,5 +33,5 @@ npm run make
 
 ## Special Thanks
 
-* [peerflix](https://github.com/mafintosh/peerflix)
 * [TorrenTV](https://github.com/TorrenTV/TorrenTV)
+* [peerflix](https://github.com/mafintosh/peerflix)
