@@ -12,7 +12,8 @@
     "name": "Andrew Claasen",
     "email": "andrew@mrclaasen.com"
   },
-  "license": "MIT",
+  "homepage":"https://cerdish.github.io/torplay-website/",
+  "license": "ISC",
   "config": {
     "forge": {
       "packagerConfig": {},
