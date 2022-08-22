@@ -11,7 +11,7 @@ const torplayServer = require('./tp-server.js')
 const PlaylistManager = require('./tp-playlist-manager.js')
 const axios = require('axios')
 const TorrentSearchApi = require('torrent-search-api')
-TorrentSearchApi.enableProvider('Rarbg')
+TorrentSearchApi.enableProvider('1337x')
 
 //supported file formats for chromecast
 const STATUS_INTERVAL_DURATION=1000
@@ -324,6 +324,8 @@ Vue.component('find-torrents',{
 
             this.addSearchToHistory(search.replace(/[^\w]/g,"."))
 
+            console.log(search);
+
             var results=await TorrentSearchApi.search(search)
 
             console.log(results)
@@ -499,10 +501,15 @@ Vue.component('editMedia',{
 
                 console.log(urlInfo)
 
-                this.media.subtitles.push({
+                this.playlistManager.addSubtitles({
                     filename:urlInfo.pathname.substr(urlInfo.pathname.lastIndexOf("/")+1)+(urlInfo.search || ""),
-                    httpUrl:subtitleUrl
-                })
+                    fileUrl:subtitleUrl
+                },this.media)
+            }else{
+                this.playlistManager.addSubtitles({
+                    filename:subtitleUrl.substr(subtitleUrl.lastIndexOf("\\")+1),
+                    filePath:subtitleUrl
+                },this.media)
             }
         },
         removeSubtitles:function(sIndex){
