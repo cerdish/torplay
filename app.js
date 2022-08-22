@@ -11,7 +11,7 @@ const torplayServer = require('./tp-server.js')
 const PlaylistManager = require('./tp-playlist-manager.js')
 const axios = require('axios')
 const TorrentSearchApi = require('torrent-search-api')
-TorrentSearchApi.enableProvider('1337x')
+TorrentSearchApi.enableProvider('ThePirateBay')
 
 //supported file formats for chromecast
 const STATUS_INTERVAL_DURATION=1000
